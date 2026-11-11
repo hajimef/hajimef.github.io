@@ -1,0 +1,3162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="魁タイマー">
+<!-- ホーム画面に置くアプリ（PWA）用：同じフォルダに manifest.webmanifest・sw.js・icons があるときに使われる -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<title>魁タイマー v208</title>
+<style>
+  /* 大きさの基準：1rem ＝ 画面の高さの10%。ただし横幅が足りない画面（4:3など）では横幅に合わせて小さくする */
+  html { font-size: 10vh; }
+  body { font-size: 16px; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; color: #fff;
+    font-family: "Roboto", "Helvetica Neue", Arial, sans-serif; overflow: hidden;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+  .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; }
+  .screen.on { display: -webkit-box; display: -webkit-flex; display: flex; }
+
+  /* ===== 設定画面（横長） ===== */
+  #setup { -webkit-flex-direction: column; flex-direction: column; padding: 0.15rem 2vw; box-sizing: border-box; }
+  .field { text-align: center; width: 22vw; }
+  .label { font-size: 0.5rem; color: #aaa; font-weight: 700; margin-bottom: 0.05rem; }
+  .btn { display: block; width: 100%; height: 1.3rem; font-size: 0.9rem; font-weight: 700; border: 0;
+    border-radius: 0.2rem; background: #333; color: #fff; outline: none; padding: 0; }
+  .btn:active { background: #555; }
+  .val { display: block; width: 100%; box-sizing: border-box; margin: 0.1rem 0; padding: 0;
+    height: 2.2rem; font-size: 2rem; font-weight: 700; line-height: 2.2rem; text-align: center;
+    background: #111; color: #fff; border: 2px solid #333; border-radius: 0.2rem; outline: none;
+    font-family: inherit; -moz-appearance: textfield; }
+  .val::-webkit-inner-spin-button, .val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .val:focus { border-color: #1e88e5; background: #0d2338; }
+
+  /* くり返しの方式 */
+  .modeBar { display: -webkit-flex; display: flex; height: 0.9rem; margin-bottom: 0.1rem; }
+  .modeBar button + button { margin-left: 1vw; }
+  /* マイタイマー使用中の印（ピンクの時計） */
+  #myMark { display: none; -webkit-flex: none; flex: none; width: 0.9rem; height: 0.9rem; margin-right: 1.5vw; padding: 0.13rem; box-sizing: border-box;
+    border-radius: 50%; background: rgba(20,20,20,0.75); color: #ff5fa8; box-shadow: 0 0 0 0.05rem rgba(255,95,168,0.7); }
+  #myMark.on { display: block; }
+  #myMark svg { display: block; }
+  #infoBtn.my { color: #ff5fa8; box-shadow: 0 0 0 0.05rem rgba(255,95,168,0.7); }
+  #infoBtn.my.on { background: #ff5fa8; color: #000; box-shadow: none; }
+  .modeBar .tot { font-size: 0.44rem; font-weight: 700; margin-left: 1.5vw; }
+  .modeBar button { height: 0.9rem; border: 0; background: #333; color: #bbb; font-size: 0.6rem; font-weight: 700; outline: none; padding: 0; white-space: nowrap; border-radius: 0.15rem; -webkit-flex: 1; flex: 1; }
+  .modeBar button.sel { background: #ff9100; color: #000; -webkit-flex: 3; flex: 3; }
+  /* 選んでいないランダムのボタンは、下のスタートボタンと同じ幅・同じ位置にそろえる */
+  .modeBar button[data-m="list"]:not(.sel) { -webkit-flex: none; flex: none; width: 22vw; margin-left: 2vw; }          /* 選んでいるほうを大きく、選んでいないほうは小さく */
+  .fArea { -webkit-flex: 1; flex: 1; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    -webkit-justify-content: space-around; justify-content: space-around; min-width: 0; }
+  .fArea.hide { display: none; }
+  .fList { -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: stretch; align-items: stretch;
+    -webkit-justify-content: center; justify-content: center; padding-right: 2vw; }
+  .tScroll::-webkit-scrollbar { width: 0; height: 0; display: none; }   /* スクロールバーは表示しない */
+  .tScroll { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; max-height: 4.6rem; }
+  .tRow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    background: #151515; border-radius: 0.15rem; padding: 0.1rem 1vw; margin-bottom: 0.12rem; }
+  .tRow .tl { width: 4.5vw; font-size: 0.45rem; font-weight: 700; color: #ff9100; text-align: center; -webkit-flex: none; flex: none; }
+  .tRow .u { font-size: 0.45rem; color: #aaa; margin: 0 1.5vw 0 0.6vw; }
+  .tRow .pm { width: 1rem; height: 1rem; padding: 0; font-size: 0.7rem; font-weight: 700; border: 0; border-radius: 0.12rem;
+    background: #333; color: #fff; outline: none; -webkit-flex: none; flex: none; }
+  .tRow .pm:active { background: #555; }
+  .tRow input { width: 8vw; height: 1rem; box-sizing: border-box; margin: 0 0.6vw; padding: 0; font-size: 0.7rem; font-weight: 700;
+    text-align: center; font-family: inherit; background: #111; color: #fff; border: 2px solid #333; border-radius: 0.12rem;
+    outline: none; -moz-appearance: textfield; }
+  .tRow input::-webkit-inner-spin-button, .tRow input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .tRow input:focus { border-color: #1e88e5; background: #0d2338; }
+  .tRow.addOnly { background: transparent; }
+  .tRow.grpRow { background: transparent; padding: 0.1em 0.15em; margin-top: 0.1em; }
+  .sepLine { height: 0.05rem; background: #ff9100; border-radius: 0.025rem; margin: 0.03rem 0 0.15rem; -webkit-flex: none; flex: none; }
+  .tRow .colon { font-size: 0.7rem; font-weight: 700; color: #ccc; margin: 0 0.8vw; }
+  .tRow .addT + .del { margin-left: 1vw; }   /* ✕ はどの行も右端にそろえる */
+  .tRow .addT { margin-left: auto; height: 0.9rem; padding: 0 1.1vw; font-size: 0.4rem; white-space: nowrap; font-weight: 700; border: 0; border-radius: 0.12rem;
+    background: #2e7d32; color: #fff; outline: none; -webkit-flex: none; flex: none; }
+  .tRow .del { margin-left: auto; height: 0.9rem; padding: 0 1.6vw; font-size: 0.45rem; border: 0; border-radius: 0.12rem; background: #555; color: #fff; outline: none; }
+  #saveHere { display: block; width: 22vw; height: 1rem; margin-top: 0.2rem; padding: 0; font-size: 0.38rem; font-weight: 700; border-radius: 0.15rem;
+    border: 0.06rem solid #ff5fa8; background: #000; color: #ff5fa8; outline: none; box-sizing: border-box; white-space: nowrap; }
+  #setup.viewLock #saveHere { display: none; }
+  /* 左側（時間の設定＋音量）と右側（スタートなどのボタン）に分ける */
+  .leftCol { -webkit-flex: 1; flex: 1; min-width: 0; display: -webkit-flex; display: flex;
+    -webkit-flex-direction: column; flex-direction: column; margin-right: 2vw; }
+  .leftCol .fArea { -webkit-flex: 1; flex: 1; min-height: 0; overflow: hidden; }
+  /* 時間の行：大きさは .tScroll の文字サイズ（k）を基準にして、画面に合わせて自動で拡大・縮小 */
+  .tScroll .tRow { padding: 0.1em 0.15em; margin-bottom: 0.12em; border-radius: 0.15em; }
+  .tScroll .tRow .tl { font-size: 0.45em; width: 1.78em; }
+  .tScroll .tRow .pm { font-size: 0.7em; width: 1.43em; height: 1.43em; border-radius: 0.17em; }
+  .tScroll .tRow input { font-size: 0.7em; width: 2.03em; height: 1.43em; margin: 0 0.086em; border-radius: 0.17em; }
+  .tScroll .tRow .colon { font-size: 0.7em; margin: 0 0.114em; }
+  .tScroll .tRow .del { font-size: 0.45em; height: 2em; padding: 0 0.67em; border-radius: 0.27em; }
+  /* 回の行（とランダムの「時間を追加」の行）も、空いている場所に合わせて大きさを変える */
+  .tRow.fitRow { padding: 0.1em 0.15em; border-radius: 0.15em; }
+  .tRow.fitRow .tl { font-size: 0.45em; width: 1.78em; }
+  .tRow.fitRow .pm { font-size: 0.7em; width: 1.43em; height: 1.43em; border-radius: 0.17em; }
+  .tRow.fitRow input { font-size: 0.7em; width: 2.03em; height: 1.43em; margin: 0 0.086em; border-radius: 0.17em; }
+  .tRow.fitRow .addT { font-size: 0.42em; height: 2.1em; padding: 0 0.5em; border-radius: 0.3em; }
+  .tScroll.two { display: -webkit-flex; display: flex; -webkit-align-items: flex-start; align-items: flex-start; }
+  .tScroll.two .tCol { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .tScroll.two .tCol + .tCol { margin-left: 0.25em; }
+  .leftCol .fArea.hide { display: none; }
+  .top { display: flex; -webkit-flex: 1; flex: 1; -webkit-justify-content: space-around; justify-content: space-around; -webkit-align-items: stretch !important; align-items: stretch !important; }
+  /* 保存するときの名前入力 */
+  #saveDlg { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 12; background: rgba(0,0,0,0.75); }
+  #saveDlg.on { display: block; }
+  #saveDlg .sm { font-size: 0.38rem; color: #aaa; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #saveDlg input { width: 100%; height: 1.1rem; box-sizing: border-box; padding: 0 1.2vw; font-size: 0.55rem; font-family: inherit;
+    background: #111; color: #fff; border: 2px solid #1e88e5; border-radius: 0.12rem; outline: none; }
+  #saveDlg .btns { display: -webkit-flex; display: flex; -webkit-justify-content: flex-end; justify-content: flex-end; margin-top: 0.25rem; }
+  #saveDlg .btns button { height: 1rem; margin-left: 1.5vw; padding: 0 3vw; font-size: 0.48rem; font-weight: 700; border: 0; border-radius: 0.12rem; outline: none; }
+  #sdOk { background: #ff5fa8; color: #000; }
+  /* やめる：右上の大きめの× */
+  #saveDlg .box { left: 8vw; right: 8vw; top: 1.4rem; padding: 0.3rem 2.5vw; border-radius: 0.2rem; background: #151515; border: 0.07rem solid #ff5fa8; position: absolute; }
+  #sdCancel { position: absolute; top: 0.2rem; right: 0.2rem; width: 0.95rem; height: 0.95rem; padding: 0; border: 0; border-radius: 50%;
+    background: #444; color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.95rem; text-align: center; outline: none; }
+  #saveDlg .ttl { font-size: 0.55rem; font-weight: 700; color: #ff5fa8; margin-bottom: 0.1rem; padding-right: 1.2rem; }
+  /* 同じ設定がすでにあるとき：真ん中に表示（一時停止中と同じ見た目・ピンク）。押すと消える */
+  #dupMsg { display: none; top: 50%; left: 50%; z-index: 14; text-align: center; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); font-size: 0.7rem; font-weight: 700; color: #fff; padding: 0.25rem 5vw; white-space: nowrap; background: rgba(90, 10, 50, 0.92); border: 0.12rem solid #ff5fa8; border-radius: 0.3rem; position: absolute; padding-right: 9vw; }
+  #dupMsg .x { position: absolute; top: 0.12rem; right: 1.5vw; width: 0.8rem; height: 0.8rem; line-height: 0.8rem; text-align: center;
+    border-radius: 50%; background: #ff5fa8; color: #000; font-size: 0.45rem; }   /* 目印の×（どこを押しても消える） */
+  #dupMsg small { display: block; font-size: 0.45rem; color: #ffc2de; margin-top: 0.12rem; }
+  #toast { display: none; position: absolute; left: 50%; bottom: 2rem; z-index: 13; -webkit-transform: translateX(-50%); transform: translateX(-50%);
+    padding: 0.15rem 3vw; border-radius: 0.15rem; background: #ff5fa8; color: #000; font-size: 0.48rem; font-weight: 700; white-space: pre-line; width: -webkit-max-content; width: max-content; max-width: 94vw; box-sizing: border-box; text-align: center; }
+  #startBtn:active { background: #1565c0; }
+
+  /* 音量の行 */
+  .bottom { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    height: 1.6rem; padding: 0 1vw; }
+  .volLabel { font-size: 0.6rem; font-weight: 700; color: #aaa; margin-right: 1.5vw; white-space: nowrap; }
+  .vbtn { width: 1.1rem; height: 1.1rem; padding: 0; font-size: 0.7rem; font-weight: 700; border: 0; border-radius: 0.15rem;
+    background: #333; color: #fff; outline: none; -webkit-flex: none; flex: none; }
+  .vbtn:active { background: #555; }
+  #vol { -webkit-flex: 1; flex: 1; min-width: 0; height: 1.2rem; margin: 0 1.5vw; background: transparent; -webkit-appearance: none; appearance: none; }
+  #vol::-webkit-slider-runnable-track { height: 0.24rem; border-radius: 0.12rem; background: #444; }
+  #vol::-webkit-slider-thumb { -webkit-appearance: none; width: 0.9rem; height: 0.9rem; margin-top: -0.33rem;
+    border-radius: 50%; background: #2e7d32; border: 0.06rem solid #fff; }   /* テスト音と同じ緑 */
+  #volVal { width: 10vw; height: 1.1rem; box-sizing: border-box; margin-left: 1.5vw; padding: 0;
+    font-size: 0.7rem; font-weight: 700; text-align: center; font-family: inherit;
+    background: #111; color: #fff; border: 2px solid #333; border-radius: 0.15rem; outline: none; -moz-appearance: textfield; }
+  #volVal::-webkit-inner-spin-button, #volVal::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  #volVal:focus { border-color: #1e88e5; background: #0d2338; }
+  .pct { font-size: 0.6rem; font-weight: 700; margin: 0 1.5vw 0 0.6vw; }
+  /* テスト音：緑の背景に白い字 */
+  #testBtn { height: 0.8rem; padding: 0 1.2vw; font-size: 0.38rem; font-weight: 700; border-radius: 0.12rem; -webkit-flex: none; flex: none; background: #2e7d32; color: #fff; outline: none; white-space: nowrap; box-sizing: border-box; border: 0; margin-left: 1vw; }
+  /* キーボード操作のオン・オフ（小さなボタン） */
+  #kbdBtn { -webkit-flex: none; flex: none; height: 0.8rem; margin-left: 0.15rem; padding: 0 0.15rem; font-size: 0.42rem; font-weight: 700;
+    border: 0.05rem solid #666; border-radius: 0.12rem; background: #111; color: #999; outline: none; white-space: nowrap; }
+  #kbdBtn .sw { margin-left: 0.08rem; font-size: 0.32rem; }
+  #kbdBtn.on { border-color: #ffd600; color: #ffd600; }
+  /* キーボードで選んでいる項目：太い黄色の枠 */
+  body.kbd *:focus { outline: 0.09rem solid #ffd600 !important; outline-offset: 0.02rem; }
+  body:not(.kbd) *:focus { outline: none; }
+  #keyHelp { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 30; background: rgba(0,0,0,0.8); }
+  #keyHelp.on { display: block; }
+  #keyHelp .box { position: absolute; left: 6vw; right: 6vw; top: 0.5rem; padding: 0.25rem 0.35rem; border-radius: 0.2rem; background: #151515; border: 0.07rem solid #ffd600; }
+  #keyHelp .ttl { font-size: 0.55rem; font-weight: 700; color: #ffd600; margin-bottom: 0.15rem; }
+  #keyHelp table { border-collapse: collapse; width: 100%; }
+  #keyHelp th { text-align: left; white-space: nowrap; padding: 0.06rem 0.25rem 0.06rem 0; font-size: 0.42rem; color: #fff; vertical-align: top; }
+  #keyHelp td { padding: 0.06rem 0; font-size: 0.4rem; color: #ddd; }
+  #keyHelp small { color: #aaa; font-size: 0.34rem; }
+  #keyHelp .hint { margin-top: 0.12rem; font-size: 0.34rem; color: #aaa; text-align: right; }
+  #presetBtn { display: block; width: 22vw; height: 1rem; margin-top: 0.2rem; padding: 0; font-size: 0.4rem; font-weight: 700;
+    border-radius: 0.15rem; border: 0.06rem solid #ff5fa8; background: #000; color: #ff5fa8; outline: none; white-space: nowrap; box-sizing: border-box; }
+  #setup.viewLock #presetBtn { display: none; }   /* 一時停止中は呼び出せないので隠す */
+  /* 保存した設定 */
+  #presetPanel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 8;
+    display: none; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.2rem 3vw 0.6rem; box-sizing: border-box; }
+  #presetPanel.on { display: block; }
+  .pRow .txt { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .pRow .nm { font-size: 0.52rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pRow .sm { font-size: 0.36rem; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.04rem; }
+  .pRow button { height: 1rem; margin-left: 1vw; padding: 0 2vw; font-size: 0.44rem; font-weight: 700; border: 0; border-radius: 0.12rem;
+    outline: none; white-space: nowrap; -webkit-flex: none; flex: none; }
+  .pRow .pLoad { background: #ff5fa8; color: #000; }
+  .pRow .pDel { background: #555; color: #fff; padding: 0 1.6vw; }
+  /* 名前の変更：歯車・音量と同じ小さな丸いボタン */
+  .pRow .nmRow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; min-width: 0; }
+  .pRow .nmRow .nm { -webkit-flex: 0 1 auto; flex: 0 1 auto; min-width: 0; }
+  .pRow .pRen { width: 0.75rem; height: 0.75rem; padding: 0.13rem; box-sizing: border-box; border-radius: 50%; margin-left: 1.5vw;
+    background: rgba(20,20,20,0.75); color: #4fc3f7; box-shadow: 0 0 0 0.045rem rgba(79,195,247,0.6); }   /* 名前の右横 */
+  .pRow .pRen svg { display: block; pointer-events: none; }
+  .pRow { display: flex; -webkit-align-items: center; align-items: center; background: #151515; border-radius: 0.15rem; padding: 0.12rem 1.2vw; margin-bottom: 0.15rem; border: 0.03rem solid #ff5fa8; }   /* 項目を細いピンクの線で囲む */
+  .pRenIn { width: 100%; height: 0.8rem; box-sizing: border-box; padding: 0 1vw; font-size: 0.48rem; font-weight: 700; font-family: inherit;
+    background: #0d2338; color: #fff; border: 2px solid #1e88e5; border-radius: 0.1rem; outline: none; }
+  #presetEmpty { font-size: 0.45rem; color: #888; padding: 0.2rem 1vw; }
+  #presetPanel .pIO { width: 1rem; height: 1rem; padding: 0.14rem; margin-right: 1.2vw; box-sizing: border-box; border: 0.06rem solid #ff5fa8;
+    border-radius: 0.14rem; color: #ff5fa8; background: #000; outline: none; }
+  #tip { display: none; position: absolute; z-index: 14; padding: 0.12rem 0.25rem; border-radius: 0.12rem; background: #ff5fa8; color: #000;
+    font-size: 0.5rem; font-weight: 700; white-space: nowrap; pointer-events: none; }
+  #presetPanel .pIO svg { display: block; pointer-events: none; }
+  #presetMsg { font-size: 0.45rem; color: #ffd600; font-weight: 700; min-height: 0.6rem; }
+  #annBtn, #sndBtn { display: block; width: 22vw; height: 1rem; margin-top: 0.2rem; padding: 0; font-size: 0.4rem; font-weight: 700; border-radius: 0.15rem; background: #2e7d32; color: #fff; outline: none; white-space: nowrap; box-sizing: border-box; border: 0.06rem solid #2e7d32; }
+  #annBtn.off, #sndBtn.off { background: #262626; color: #777; border-color: #2e7d32; }   /* なし：中を薄く、まわりは緑の枠 */
+  #annBtn.off .chip, #sndBtn.off .chip { background: #444; color: #999; }
+
+  /* ===== アナウンス設定 ===== */
+  #annPanel, #sndPanel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 8;
+    display: none; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.2rem 3vw 0.6rem; box-sizing: border-box; }
+  #annPanel.on, #sndPanel.on { display: block; }
+  .seg { display: -webkit-flex; display: flex; margin-left: 1vw; }
+  .seg button { margin-left: 0 !important; border-radius: 0 !important; background: #333; color: #bbb; padding: 0 1.6vw !important; }
+  .seg button:first-child { border-radius: 0.12rem 0 0 0.12rem !important; }
+  .seg button:last-child { border-radius: 0 0.12rem 0.12rem 0 !important; }
+  .seg button.sel { background: #ff9100; color: #000; }
+  .grow { -webkit-flex: 1; flex: 1; }
+  .unitSeg { display: -webkit-flex; display: flex; -webkit-flex: none; flex: none; margin-left: 0.5vw; }
+  #sndList .unitSeg button { margin-left: 0 !important; padding: 0 0.6vw !important; font-size: 0.32rem; letter-spacing: -0.04em;
+    background: #333; color: #bbb; border-radius: 0 !important; }
+  #sndList .unitSeg button:first-child { border-radius: 0.12rem 0 0 0.12rem !important; }
+  #sndList .unitSeg button:last-child { border-radius: 0 0.12rem 0.12rem 0 !important; border-left: 0.06rem solid #ff9100; }
+  #sndList .unitSeg button.sel { background: #ff9100; color: #000; }
+  #sndList .tenInfo { -webkit-flex: 1; flex: 1; min-width: 0; margin-left: 0.5vw; height: 1rem; box-sizing: border-box;
+    border-radius: 0.12rem; background: #ff9100; color: #000; font-size: 0.42rem; font-weight: 700; text-align: center;
+    overflow: hidden; letter-spacing: -0.02em; line-height: 1.1; padding: 0 0.1rem;
+    display: -webkit-flex; -webkit-flex-direction: column; -webkit-justify-content: center; }
+  #sndList .tenInfo span { display: block; white-space: nowrap; }
+  .onoff { display: -webkit-flex; display: flex; margin-left: 2vw; }
+  /* マニュアル：ノートのマーク（カウント画面の歯車・音量ボタンと同じ見た目） */
+  #sndManBtn { width: 1.1rem; height: 1.1rem; margin-left: 2.5vw; padding: 0.16rem; box-sizing: border-box; -webkit-flex: none; flex: none;
+    border: 0; border-radius: 50%; background: rgba(20,20,20,0.75); color: #4fc3f7; outline: none;
+    box-shadow: 0 0 0 0.05rem rgba(79,195,247,0.6); }
+  #sndManBtn.on { background: #4fc3f7; color: #000; box-shadow: none; }
+  #sndManBtn svg { display: block; pointer-events: none; }
+  #sndManual { display: none; position: relative; margin: 0 0 0.2rem 0; padding: 0.2rem 2.5vw; border-radius: 0.2rem;
+    background: #1d1d1d; border: 0.06rem solid #4fc3f7; }
+  #sndManual.on { display: block; }
+  #sndManual p { margin: 0 0 0.15rem 0; font-size: 0.5rem; font-weight: 700; line-height: 1.5; color: #fff; }
+  #sndManual p.sub { font-size: 0.4rem; font-weight: 400; color: #ccc; }
+  #sndManClose { height: 0.9rem; padding: 0 3vw; font-size: 0.45rem; font-weight: 700; border: 0; border-radius: 0.12rem;
+    background: #4fc3f7; color: #000; outline: none; }
+  .headBox { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    border: 0.07rem solid #ff9100; border-radius: 0.2rem; padding: 0.08rem 0.8vw 0.08rem 2vw; }
+  .onoff button { height: 0.8rem; width: 11vw; padding: 0; font-size: 0.42rem; font-weight: 700; border: 0; background: #333; color: #bbb; outline: none; }
+  .onoff button:first-child { border-radius: 0.12rem 0 0 0.12rem; }
+  .onoff button:last-child { border-radius: 0 0.12rem 0.12rem 0; border-left: 0.08rem solid #2e7d32; }
+  .onoff button.sel { background: #2e7d32; color: #fff; }   /* あり／なし：緑 */
+  #annList .annRow button { padding: 0 1.4vw; }   /* 🔊 と ✕ を小さくして、文章の欄を広く */
+  #annList .annRow input.txt { margin-left: 1vw; }
+  /* 1行に収める：音の種類のボタンが残りの幅を4等分 */
+  #sndList .seg { -webkit-flex: 1; flex: 1; min-width: 0; margin: 0 0 0 0.5vw; }
+  #sndList .seg button { -webkit-flex: 1 1 0; flex: 1 1 0; width: 0; min-width: 0; font-size: 0.34rem; line-height: 1.15;
+    padding: 0 0.3vw !important; text-align: center; margin-left: 0 !important; white-space: nowrap; overflow: hidden; }   /* 2行・同じ幅 */
+  #sndList .seg button + button { border-left: 0.08rem solid #ff9100; }   /* オレンジの区切り線 */
+  #sndList .annRow button { font-size: 0.4rem; padding: 0 0.9vw; margin-left: 0.5vw; }
+  /* 2段に。上＝残り時間（－＋つき）と1秒/10秒、下＝音の種類（小さめ）と回数（－＋つき） */
+  #sndList .annRow { padding: 0.12rem 0.8vw; -webkit-flex-wrap: wrap; flex-wrap: wrap; row-gap: 0.12rem; }
+  #sndList .annRow .brk { -webkit-flex-basis: 100%; flex-basis: 100%; height: 0; }
+  #sndList .annRow .pm { width: 0.9rem; min-width: 0; height: 0.9rem; padding: 0 !important; margin: 0 0.06rem !important; font-size: 0.55rem; font-weight: 700;
+    border: 0; border-radius: 0.12rem; background: #333; color: #fff; -webkit-flex: none; flex: none; }
+  #sndList .annRow .pm:active { background: #555; }
+  #sndList .annRow input.num { padding: 0; width: 1.1rem; height: 0.9rem; font-size: 0.5rem; font-weight: 700; }
+  #sndList .annRow .t { font-size: 0.36rem; margin: 0 0.12rem; }
+  #sndList .annRow .unitSeg { margin-left: 0.35rem; }
+  #sndList .annRow .unitSeg button { height: 0.9rem; min-width: 1.75rem; font-size: 0.58rem; font-weight: 700; letter-spacing: 0; padding: 0 0.25rem !important; }   /* 1秒・10秒：大きく */
+  #sndList .annRow .seg, #sndList .annRow .tenInfo { -webkit-flex: 1 1 6rem; flex: 1 1 6rem; margin-left: 0; }
+  #sndList .annRow .seg button { font-size: 0.3rem; height: 0.8rem; line-height: 0.8rem; padding-top: 0 !important; padding-bottom: 0 !important; }   /* 音の種類の説明は小さめ */
+  #sndList .annRow .tenInfo { height: 0.8rem; }
+  .annHead { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 0.2rem; }
+  .annTitle { font-size: 0.7rem; font-weight: 700; }
+  .annTitle.gTitle { background: #2e7d32; color: #fff; padding: 0.04rem 0.25rem; border-radius: 0.1rem; }   /* 合図音・アナウンス：見出しの背景は緑 */
+  #sndOnOff button, #annOnOff button { height: 0.9rem; width: 13vw; font-size: 0.56rem; }                  /* あり・なし：大きい文字 */
+  .annHead .grow { -webkit-flex: 1; flex: 1; }
+  .annRow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    background: #151515; border-radius: 0.15rem; padding: 0.15rem 1.5vw; margin-bottom: 0.15rem; }
+  .annRow .t { font-size: 0.45rem; color: #aaa; margin: 0 0.8vw; white-space: nowrap; }
+  .annRow input { height: 1rem; box-sizing: border-box; font-size: 0.55rem; font-weight: 700; font-family: inherit;
+    background: #111; color: #fff; border: 2px solid #333; border-radius: 0.12rem; outline: none; padding: 0 1vw; }
+  .annRow input:focus { border-color: #1e88e5; background: #0d2338; }
+  .annRow input.num { width: 9vw; text-align: center; -moz-appearance: textfield; }
+  .annRow input.num::-webkit-inner-spin-button, .annRow input.num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .annRow input.txt { -webkit-flex: 1; flex: 1; min-width: 0; font-weight: 400; margin-left: 1vw; }
+  .annRow button, .annHead button, #annAdd { height: 1rem; padding: 0 2vw; font-size: 0.45rem; font-weight: 700;
+    border: 0; border-radius: 0.12rem; color: #fff; outline: none; white-space: nowrap; margin-left: 1vw; }
+  .annPlay { background: #2e7d32; }
+  .annPlay.stop { background: #c62828; }
+  .annDel { background: #555; }
+  #annClose, #sndClose { background: #1e88e5; }
+  #annClear { background: #555; margin-right: 0.15rem; }
+  #annAdd, #sndAdd { height: 1rem; padding: 0 2vw; font-size: 0.45rem; font-weight: 700; border: 0; border-radius: 0.12rem;
+    color: #fff; outline: none; background: #2e7d32; margin: 0.1rem 0 0 0; }
+  #annMsg { font-size: 0.4rem; color: #ffd600; margin-top: 0.2rem; }
+  #testBtn.on { background: #1b5e20; }
+
+  /* ===== 実行画面 ===== */
+  #run { -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+  #cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  #state { position: absolute; top: 50%; left: 50%; z-index: 2; white-space: nowrap;
+    -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%);
+    font-size: 1.2rem; font-weight: 700; color: #fff; padding: 0.2rem 5vw;
+    background: rgba(0, 40, 120, 0.35); border: 0.12rem solid #2979ff; border-radius: 0.3rem; }
+  #state:empty { display: none; }
+  /* アナウンス中の大きな文字（試合・移動）：画面いっぱい */
+  #bigWord { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 2; pointer-events: none;
+    -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+    font-weight: 900; line-height: 1; white-space: nowrap; }
+  #bigWord.on { display: -webkit-flex; display: flex; }
+  #bigWord .bw { line-height: 1; }
+  #bigWord .bc { position: absolute; right: 1.2vw; bottom: 1.2vh; font-family: Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 700;
+    line-height: 1; letter-spacing: 0.02em; }   /* 右下の余白に入れるカウント（ふちは背景色で、文字と重なっても読める） */
+  /* 色は、そのときのカウントの背景と数字の色（JSで設定） */
+  #ctrl { position: absolute; z-index: 5; bottom: 0; left: 0; right: 0; padding: 0.3rem 0; text-align: center;
+    background: rgba(0,0,0,0.75); display: none; z-index: 3; }
+  #ctrl.on { display: block; }
+  #ctrl button { width: 28vw; height: 1.8rem; font-weight: 700; border: 0; border-radius: 0.2rem; margin: 0 2vw; background: #333; color: #fff; outline: none; font-size: 0.58rem; white-space: nowrap; vertical-align: top; padding: 0; }   /* 「一時停止を解除」も1行で */
+  #ctrl button, .vbtns button { background: #4fc3f7; color: #000; }      /* 再開・やめる・設定を見る：水色 */
+  #ctrl button:active, .vbtns button:active { background: #29a3d6; }
+  #ctrl #viewBtn { display: none; }
+  /* 左上の小さいボタン：押すと設定内容を表示／もう一度押すと消す */
+  #infoBtn { position: absolute; top: 0.12rem; left: 1vw; z-index: 3; width: 1.2rem; height: 1.2rem; padding: 0.13rem; box-sizing: border-box;
+    border: 0; border-radius: 50%; background: rgba(20,20,20,0.75); color: #4fc3f7; outline: none;
+    box-shadow: 0 0 0 0.05rem rgba(79,195,247,0.6); }
+  /* 右上の音量ボタン：カウントを止めずに音量を変える */
+  #runVolBtn { position: absolute; top: 0.12rem; right: 1vw; z-index: 3; width: 1.2rem; height: 1.2rem; padding: 0.18rem; box-sizing: border-box;
+    border: 0; border-radius: 50%; background: rgba(20,20,20,0.75); color: #4fc3f7; outline: none;
+    box-shadow: 0 0 0 0.05rem rgba(79,195,247,0.6); }
+  #runVolBtn.on { background: #4fc3f7; color: #000; box-shadow: none; }
+
+  /* 歯車の下の砂時計：経過・残り・合計の時間を出す／消す（原則は表示） */
+  #timeBtn { position: absolute; top: 1.5rem; left: 1vw; z-index: 3; width: 1.2rem; height: 1.2rem; padding: 0.16rem; box-sizing: border-box;
+    border: 0; border-radius: 50%; background: rgba(20,20,20,0.75); color: #4fc3f7; outline: none;
+    box-shadow: 0 0 0 0.05rem rgba(79,195,247,0.6); }
+  #timeBtn.on { background: #4fc3f7; color: #000; box-shadow: none; }
+  #timeBtn svg { display: block; pointer-events: none; }
+  #runVolBtn svg { display: block; }
+  #runVolPanel { display: none; position: absolute; top: 1.5rem; right: 1vw; z-index: 4; width: 62vw; box-sizing: border-box;
+    -webkit-align-items: center; align-items: center; padding: 0.15rem 1.5vw; border-radius: 0.2rem;
+    background: rgba(0,0,0,0.88); border: 0.06rem solid #4fc3f7; }
+  #runVolPanel.on { display: -webkit-flex; display: flex; }
+  #runVolPanel .rvb { width: 1.2rem; height: 1.2rem; padding: 0; font-size: 0.8rem; font-weight: 700; border: 0; border-radius: 0.15rem;
+    background: #4fc3f7; color: #000; outline: none; -webkit-flex: none; flex: none; }
+  #rvSlider { -webkit-flex: 1; flex: 1; min-width: 0; height: 1.2rem; margin: 0 1.5vw; background: transparent; -webkit-appearance: none; appearance: none; }
+  #rvSlider::-webkit-slider-runnable-track { height: 0.24rem; border-radius: 0.12rem; background: #444; }
+  #rvSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 0.9rem; height: 0.9rem; margin-top: -0.33rem; border-radius: 50%;
+    background: #4fc3f7; border: 0.06rem solid #fff; }
+  #rvVal { width: 12vw; text-align: right; font-size: 0.7rem; font-weight: 700; color: #fff; -webkit-flex: none; flex: none; }
+  #infoBtn.on { background: #4fc3f7; color: #000; box-shadow: none; }
+  #infoBtn svg { display: block; }
+  #infoBtn svg, #runVolBtn svg { pointer-events: none; }   /* 押したのはボタン本体として扱う */
+  /* 一時停止中に設定を見ているとき：スタートボタンが「タイマーにもどる」になる */
+  #startBtn.resume { background: #1e88e5; font-size: 0.6rem; line-height: 1.25; }
+  #startBtn.resume small { display: block; font-size: 0.4rem; font-weight: 700; color: #ffd600; margin-top: 0.1rem; }
+  /* 設定を見ているとき：上に「一時停止中」を表示（カウント画面の表示と同じ見た目） */
+  #pauseBanner { display: none; position: absolute; top: 1.15rem; left: 2vw; z-index: 6; white-space: nowrap;
+    box-sizing: border-box; text-align: center; overflow: hidden;
+    font-size: 0.5rem; font-weight: 700; color: #fff; padding: 0.06rem 4vw;
+    background: #0a2a6e; border: 0.08rem solid #2979ff; border-radius: 0.2rem; }
+  #setup.viewLock #pauseBanner { display: block; }
+  #setup.viewLock .modeBar, #setup.viewLock #fList { opacity: 0.3; pointer-events: none; }
+  /* 一時停止中は選べないので、選べない色（くすんだ色）にする。「経過／合計」は読める明るさ */
+  #setup.viewLock .modeBar { opacity: 1; }
+  #setup.viewLock .modeBar button { background: #262626; color: #8a8a8a; }
+  #setup.viewLock .modeBar button.sel { background: #9c6a2c; color: #1a1208; }   /* くすんだオレンジ */
+  /* 一時停止中の設定画面：もとの時間の設定をそのまま見せる。変えられないので灰色にして押せない */
+  #setup.viewLock #fList { opacity: 1; pointer-events: none; }
+  #setup.viewLock #fList .tRow, #setup.viewLock #fList .sepLine { -webkit-filter: grayscale(1) brightness(0.5); filter: grayscale(1) brightness(0.5); }
+  #setup.viewLock #fList .tRow.vCur { -webkit-filter: grayscale(1) brightness(0.95); filter: grayscale(1) brightness(0.95);
+    box-shadow: inset 0 0 0 0.07rem #fff; border-radius: 0.15rem; }   /* いまの時間：明るく、白い枠 */
+  #backBtn { position: absolute; top: 0.05rem; right: 1.5vw; z-index: 4; display: none; height: 0.95rem; padding: 0 4vw;
+    font-size: 0.65rem; font-weight: 700; border: 0; border-radius: 0.15rem; background: #1e88e5; color: #fff; outline: none; }
+  #backBtn:active { background: #1565c0; }
+
+
+  /* 縦向きのとき */
+  #rotate { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000;
+    color: #fff; z-index: 10; text-align: center; font-size: 7vw; font-weight: 700; padding-top: 4rem; box-sizing: border-box; }
+  @media (orientation: portrait) { #rotate { display: block; } }
+  /* 右の列（スタート・合図音・アナウンス・この設定を保存・マイタイマー）：縦いっぱいを使い、少しずつ離す */
+  .startCol { width: 22vw; -webkit-flex: none; flex: none; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-justify-content: flex-start !important; justify-content: flex-start !important; }
+  .startCol > button, .startCol > .vbtns { height: auto !important; min-height: 0; margin-top: 0.16rem !important; margin-bottom: 0 !important; }
+  .startCol > :first-child { margin-top: 0 !important; }
+  #startBtn { display: block; width: 22vw; height: 3rem; font-size: 0.7rem; white-space: nowrap; border-radius: 0.3rem; line-height: 1.3; background: #1e88e5; color: #fff; border: 0; font-weight: 700; outline: none; -webkit-flex: 2.4 1 0; flex: 2.4 1 0; }
+  #sndBtn, #annBtn, #saveHere, #presetBtn { -webkit-flex: 1 1 0; flex: 1 1 0; font-size: 0.5rem; }   /* スタートの下の4つ：大きい文字 */
+  #annBtn .chip, #sndBtn .chip { display: inline-block; border-radius: 0.08rem; background: #fff; color: #1b7a2a; font-size: 0.44rem; margin-left: 0.6vw; padding: 0 0.6vw; }
+  .vbtns { display: none; -webkit-flex: 3.4 1 0; flex: 3.4 1 0; -webkit-flex-direction: column; flex-direction: column; margin-top: 0 !important; }
+  .vbtns button { display: block; width: 22vw; margin-bottom: 0.2rem; padding: 0; border: 0; border-radius: 0.15rem; font-size: 0.46rem; font-weight: 700; outline: none; white-space: nowrap; -webkit-flex: 1 1 0; flex: 1 1 0; height: auto !important; margin: 0 0 0.16rem 0 !important; }
+  .vbtns button:last-child { margin-bottom: 0 !important; }
+  /* 増やす・減らす・全部消す */
+  .addGrp { display: -webkit-flex; display: flex; margin-left: auto; -webkit-flex: none; flex: none; }
+  .addGrp button:first-child { margin-left: 0; }
+  .addGrp button { font-size: 0.4em; height: 2.15em; padding: 0 0.55em; margin-left: 0.35em; border: 0; border-radius: 0.3em; font-weight: 700; color: #fff; outline: none; white-space: nowrap; -webkit-flex: 1 1 auto; flex: 1 1 auto; }
+  .addGrp .gAdd, .addGrp .gSub, .addGrp .gClr { background: #ff9100; color: #000; }   /* 時間を増やす・減らす・全部消す：オレンジ */
+  .addGrp button.off { opacity: 0.3; pointer-events: none; }
+  /* 「全部消しました［元に戻す］」：画面の真ん中に、黄色の枠で大きく */
+  /* ×と「元に戻す」を離す：1行目に文字（右上に×）、2行目に大きな「元に戻す」 */
+  #undoBar { display: none; position: absolute; z-index: 13; color: #fff; font-weight: 700; white-space: nowrap; left: 50% !important; top: 50% !important; bottom: auto !important; -webkit-transform: translate(-50%, -50%) !important; transform: translate(-50%, -50%) !important; border: 0.1rem solid #ffd600; border-radius: 0.25rem !important; background: rgba(25,25,25,0.96) !important; font-size: 0.6rem !important; box-shadow: 0 0 0.6rem rgba(0,0,0,0.95) !important; text-align: center; padding: 0.3rem 1.0rem 0.3rem 1.0rem !important; }
+  #undoBar button { font-weight: 700; border: 0; background: #ffd600; color: #000; outline: none; margin-left: 0.35rem !important; font-size: 0.55rem !important; border-radius: 0.15rem !important; display: block; margin: 0.25rem auto 0 !important; height: 1.1rem !important; padding: 0 0.6rem !important; }
+  #undoBar .ux { position: absolute; text-align: center; border-radius: 50%; font-size: 0.38rem; font-weight: 700; top: 0.15rem !important; right: 0.15rem !important; width: 0.65rem !important; height: 0.65rem !important; line-height: 0.65rem !important; background: #444 !important; color: #fff !important; box-shadow: none !important; }
+  /* 時間の行の色ボタン */
+  .tScroll .tRow .cdot { font-size: 0.34em; height: 2.95em; margin-left: 0.9em; padding: 0 0.5em; border-radius: 0.35em; box-sizing: border-box;
+    border: 0.22em solid #888; outline: none; -webkit-flex: none; flex: none; font-weight: 700; white-space: nowrap; font-family: inherit; }
+  .tScroll .tRow .cdot.short { font-size: 0.55em; height: 1.82em; margin-left: 0.5em; padding: 0 0.3em; border-radius: 0.25em; border-width: 0.14em; }
+  /* 「色を選ぶ」：選んだ背景の色に、選んだ数字の色の文字 */
+  /* 数字の色を選ぶ画面 */
+  #colorDlg { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 12; background: rgba(0,0,0,0.75); }
+  #colorDlg.on { display: block; }
+  #colorDlg .box { position: absolute; left: 3vw; right: 3vw; top: 0.6rem; max-height: calc(100% - 0.9rem); overflow-y: auto; box-sizing: border-box; padding: 0.3rem 0.3rem 0.35rem; border-radius: 0.2rem;
+    background: #151515; border: 0.07rem solid #fff; text-align: center; }
+  #colorDlg .ttl { font-size: 0.55rem; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+  #cdX { position: absolute; top: 0.2rem; right: 0.2rem; width: 0.95rem; height: 0.95rem; padding: 0; border: 0; border-radius: 50%;
+    background: #444; color: #fff; font-size: 0.5rem; font-weight: 700; outline: none; }
+  #colorDlg .cdBody { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+  #colorDlg .opts { text-align: left; -webkit-flex: none; flex: none; }
+  #cdPrev { -webkit-flex: 0 1 auto; flex: 0 1 auto; min-width: 0; margin-left: auto !important; margin-left: 0.35rem; margin-right: 0.1rem; border: 0.05rem solid #555; border-radius: 0.08rem; }   /* 完成イメージ（大きく） */
+  #colorDlg .cRow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin: 0.36rem 0; }
+  #colorDlg .cLab { width: 2.05rem; -webkit-flex: none; flex: none; font-size: 0.38rem; font-weight: 700; color: #ddd; text-align: right; padding-right: 0.2rem; }
+  #colorDlg .opt { width: 1.05rem; height: 1.15rem; margin: 0 0.2rem; padding: 0; border: 0.06rem solid #555; border-radius: 0.1rem; outline: none;
+    font-family: Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; font-weight: 700; line-height: 1.02rem; box-sizing: border-box; -webkit-flex: none; flex: none; }
+  #colorDlg .opt.lc { font-size: 0.6rem; font-family: inherit; font-weight: 900; }
+  #colorDlg .opt.sel { -webkit-transform: scale(1.5); transform: scale(1.5); position: relative; z-index: 1;   /* 選んだもの：ひとまわり大きく */
+    box-shadow: 0 0.06rem 0.18rem rgba(0,0,0,0.9); }
+  #cdAll { margin-top: 0.3rem; height: 0.95rem; padding: 0 0.4rem; font-size: 0.45rem; font-weight: 700; border: 0; border-radius: 0.15rem;
+    background: #333; color: #fff; outline: none; }
+  #apListBtn .ic, #apPanel .annTitle .ic { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.17em; margin-right: 0.25em; pointer-events: none; }
+  #presetBtn .ic, #presetPanel .annTitle .ic { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.17em; margin-right: 0.25em; }
+  /* アナウンスの行：文例のプルダウン */
+  #annList .annRow select.phSel { width: 1.75rem; height: 1rem; box-sizing: border-box; margin: 0 0 0 0.8vw; padding: 0 0.15rem; font-size: 0.42rem; font-weight: 700;
+    font-family: inherit; border: 0; border-radius: 0.12rem; background: #ff9100; color: #000; outline: none; -webkit-flex: none; flex: none;
+    -webkit-appearance: none; appearance: none; text-align: center; text-align-last: center; }
+  #annList .annRow select.phSel option { background: #222; color: #fff; text-align: left; }
+  /* アナウンス画面：いつ・どの時間で */
+  #annList select { height: 0.85rem; margin-right: 0.12rem; padding: 0 0.1rem; font-size: 0.4rem; font-weight: 700; font-family: inherit;
+    background: #222; color: #fff; border: 0.05rem solid #888; border-radius: 0.12rem; outline: none; }
+  /* アナウンス画面：1段目＝どの時間で・いつ（ボタン）、2段目＝時間・文章、3段目＝よく使う文章 */
+  #annList .l1 .grow { -webkit-flex: 1 1 0; flex: 1 1 0; }
+  #annList .l1 .cnt input.num { width: 1.15rem; height: 0.95rem; margin: 0 0.08rem; font-size: 0.6rem; font-weight: 700; }
+  #annList .l1 .cnt .pm { width: 0.95rem; height: 0.95rem !important; background: #333 !important; color: #fff !important; font-size: 0.6rem !important; }
+  #annList .l1 .cnt .t { font-size: 0.45rem !important; font-weight: 700; color: #ddd; margin-left: 0.08rem; }
+  #annList .l1 .disp { -webkit-flex: none; flex: none; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; margin: -0.08rem 0.1rem 0.06rem 0.15rem; }   /* アナウンス表示：回数の横（タイトルを上に） */
+  #annList .l1 .disp.wrap { -webkit-flex-direction: row; flex-direction: row; -webkit-align-items: center; align-items: center; margin: 0.05rem 0 0.06rem 0.1rem; }
+  #annList .l1 .disp.wrap .dLab { font-size: 0.4rem; margin: 0 0.2rem 0 0; }
+  #annList .l1 .disp .dRow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }   /* アナウンス表示：回数の横 */
+  #annList .l1 .disp .dLab { font-size: 0.34rem; font-weight: 700; color: #ddd; line-height: 1.1; margin: 0 0 0.03rem 0.05rem; white-space: nowrap; }
+  #annList .l1 .disp .dOn { display: -webkit-flex; display: flex; margin-right: 0.12rem; }
+  #annList .l1 .disp .dOn button:not(.sel) { background: #333 !important; color: #aaa !important; }
+  #annList .l1 .disp .dOn button { height: 0.8rem !important; min-width: 0 !important; margin: 0 !important; -webkit-flex: none !important; flex: none !important; padding: 0 0.22rem !important; font-size: 0.42rem !important; font-weight: 700; border: 0; background: #333; color: #aaa; border-radius: 0; }
+  #annList .l1 .disp .dOn button:first-child { border-radius: 0.12rem 0 0 0.12rem; }
+  #annList .l1 .disp .dOn button:last-child { border-radius: 0 0.12rem 0.12rem 0; }
+  #annList .l1 .disp .dOn button.sel { background: #ff9100 !important; color: #000 !important; }
+  #annList .l1 .disp input.dTxt { width: 2.3rem; padding: 0 0.12rem; height: 0.8rem; box-sizing: border-box; font-size: 0.45rem; font-weight: 700; }
+  #annList .l1 .annDel { position: absolute; top: 0.18rem; right: 0.15rem; margin: 0 !important; width: 0.9rem; min-width: 0; padding: 0 !important; }   /* 削除は右上に固定 */
+  #annList .l1 .segT, #annList .l1 .segW { -webkit-flex: none; flex: none; -webkit-flex-wrap: nowrap; flex-wrap: nowrap; }   /* 折り返さない（入らないときは段ごと下へ） */
+  #annList .l1 .cnt { display: flex; -webkit-align-items: center; align-items: center; margin: 0.02rem 0.2rem 0 0.35rem; -webkit-flex: none; flex: none; }
+  #annList .segT button.sel { background: #ff9100 !important; color: #000 !important; }
+  #annList .segW button.sel { background: #ff9100 !important; color: #000 !important; }
+  #annList .annRow .t { font-size: 0.32rem; margin: 0 0.06rem; }
+  #annList .annRow input.num { width: 1.2rem; }
+  /* アナウンス：どの時間で（青で囲む）・いつ（黄色で囲む）。指で押しやすい大きさ */
+  #annList .segT, #annList .segW { display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; padding: 0.06rem 0.06rem 0 0.06rem; border-radius: 0.16rem; margin-right: 0.25rem; margin-bottom: 0.06rem; }
+  /* アナウンスの設定の保存・呼び出し */
+  .annFoot { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-top: 0.1rem; }
+  .annFoot #annAdd { margin: 0; }
+  #apSaveBtn, #apListBtn { height: 1rem; margin-left: 0.15rem; padding: 0 0.3rem; font-size: 0.45rem; font-weight: 700; border-radius: 0.12rem;
+    border: 0.06rem solid #ff5fa8; background: #000; color: #ff5fa8; outline: none; white-space: nowrap; }
+  #apSaveDlg { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 12; background: rgba(0,0,0,0.75); }
+  #apSaveDlg.on { display: block; }
+  #apSaveDlg .box { position: absolute; left: 8vw; right: 8vw; top: 1.4rem; padding: 0.3rem 0.25rem; border-radius: 0.2rem; background: #151515; border: 0.07rem solid #ff5fa8; }
+  #apSaveDlg .ttl { font-size: 0.55rem; font-weight: 700; color: #ff5fa8; margin-bottom: 0.1rem; padding-right: 1.2rem; }
+  #apSaveDlg .sm { font-size: 0.38rem; color: #aaa; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #apSaveDlg .dx { position: absolute; top: 0.2rem; right: 0.2rem; width: 0.95rem; height: 0.95rem; padding: 0; border: 0; border-radius: 50%;
+    background: #444; color: #fff; font-size: 0.5rem; font-weight: 700; outline: none; }
+  #apName { width: 100%; height: 1.1rem; box-sizing: border-box; padding: 0 0.12rem; font-size: 0.55rem; font-family: inherit;
+    background: #111; color: #fff; border: 2px solid #1e88e5; border-radius: 0.12rem; outline: none; }
+  #apSaveDlg .btns { display: -webkit-flex; display: flex; -webkit-justify-content: flex-end; justify-content: flex-end; margin-top: 0.25rem; }
+  #apSaveOk { height: 1rem; padding: 0 0.5rem; font-size: 0.48rem; font-weight: 700; border: 0; border-radius: 0.12rem; background: #ff5fa8; color: #000; outline: none; }
+  #apPanel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 11; display: none; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; padding: 2vh 3vw 6vh; box-sizing: border-box; }
+  #apPanel.on { display: block; }
+  /* 選択ボタンは横に長く・縦は低め（スクロールしなくて済むように） */
+  #annList .l1 { width: 100%; display: flex; -webkit-align-items: flex-start; align-items: flex-start; margin-bottom: 0.1rem; padding-right: 1.05rem; box-sizing: border-box; -webkit-flex-wrap: wrap; flex-wrap: wrap; }   /* 入らないときは、回数と✕を次の段へ */
+  #annList .segT { border: 0.06rem solid #ff9100; -webkit-flex: 1 1 0; flex: 1 1 0; min-width: 0; -webkit-flex-wrap: nowrap; flex-wrap: nowrap; }
+  #annList .segW { border: 0.06rem solid #ff9100; -webkit-flex: 1.1 1 0; flex: 1.1 1 0; min-width: 0; margin-right: 0 !important; }
+  #annList .l1 button { font-weight: 700; background: #2a2a2a !important; color: #bbb !important; border: 0 !important; margin: 0 0.06rem 0.06rem 0 !important; border-radius: 0.14rem !important; -webkit-flex: 1 1 auto; flex: 1 1 auto; height: 0.8rem !important; min-width: 0.9rem; padding: 0 0.1rem !important; font-size: 0.48rem !important; white-space: nowrap; }
+  #annList .segW button[data-v="start"] { -webkit-flex-grow: 1.6; flex-grow: 1.6; }
+  #annPanel { padding-bottom: 1vh !important; }
+  #annList .annRow { -webkit-flex-wrap: wrap; flex-wrap: wrap; position: relative; padding-top: 0.08rem; padding-bottom: 0.08rem; margin-bottom: 0.12rem; }
+  .nmErr { min-height: 0.45rem; margin-top: 0.08rem; font-size: 0.4rem; font-weight: 700; color: #ffd600; }
+  #annMyMark { display: none; width: 0.95rem; height: 0.95rem; margin-right: 0.15rem; padding: 0.13rem; box-sizing: border-box; border-radius: 50%;
+    background: rgba(20,20,20,0.75); color: #ff5fa8; box-shadow: 0 0 0 0.05rem rgba(255,95,168,0.7); -webkit-flex: none; flex: none; }
+  #annMyMark.on { display: block; }
+  #annMyMark svg { display: block; }
+  #annMyName { display: none; max-width: 3.5rem; margin-right: 0.2rem; font-size: 0.4rem; font-weight: 700; color: #ff5fa8;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #annMyName.on { display: block; }
+  #verTag { position: absolute; left: 0.15rem; bottom: 0.04rem; font-size: 0.26rem; color: #777; pointer-events: none; z-index: 1; }
+  /* 注意のポップアップ：画面の真ん中に大きく */
+  #warnDlg { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 30; background: rgba(0,0,0,0.72); }
+  #warnDlg.on { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+  #warnDlg .box { max-width: 90vw; max-height: 90vh; overflow-y: auto; box-sizing: border-box; padding: 0.3rem 0.5rem 0.35rem; border-radius: 0.25rem;
+    background: #1a1a1a; border: 0.12rem solid #ffd600; box-shadow: 0 0 0.6rem rgba(0,0,0,0.95); text-align: center; }
+  #warnDlg .ttl { font-size: 0.75rem; font-weight: 700; color: #ffd600; margin-bottom: 0.15rem; }
+  #warnDlg .msg { text-align: left; }
+  #warnDlg .msg p { margin: 0 0 0.14rem 0; font-size: 0.45rem; font-weight: 700; line-height: 1.4; color: #fff; }
+  #warnDlg .msg p.sub { font-size: 0.38rem; font-weight: 400; color: #ccc; }
+  #warnOk { height: 1rem; margin-top: 0.15rem; padding: 0 1rem; font-size: 0.55rem; font-weight: 700; border: 0; border-radius: 0.15rem;
+    background: #ffd600; color: #000; outline: none; }
+</style>
+</head>
+<body>
+
+<!-- 設定画面 -->
+<div id="setup" class="screen on">
+<div id="verTag">魁タイマー v208</div>
+ <div id="pauseBanner">一時停止中</div>
+ <div class="modeBar" id="modeBar">
+  <div id="myMark" title="マイタイマー使用中"><svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <button data-m="same">リピート<span class="tot"></span></button>
+  <button data-m="list">ランダム<span class="tot"></span></button>
+ </div>
+ <div class="top">
+ <div class="leftCol">
+ <div class="fArea" id="fSame">
+  <div class="field">
+    <div class="label">分</div>
+    <button class="btn" data-k="min" data-d="1">＋</button>
+    <input class="val" id="vMin" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99">
+    <button class="btn" data-k="min" data-d="-1">－</button>
+  </div>
+  <div class="field">
+    <div class="label">秒</div>
+    <button class="btn" data-k="sec" data-d="1">＋</button>
+    <input class="val" id="vSec" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59">
+    <button class="btn" data-k="sec" data-d="-1">－</button>
+  </div>
+  <div class="field">
+    <div class="label">回数</div>
+    <button class="btn" data-k="rep" data-d="1">＋</button>
+    <input class="val" id="vRep" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="99">
+    <button class="btn" data-k="rep" data-d="-1">－</button>
+  </div>
+ </div>
+ <div class="fArea fList hide" id="fList"></div>
+  <div class="bottom">
+  <span class="volLabel">音量</span>
+  <button class="vbtn" id="volDown">－</button>
+  <input id="vol" type="range" min="0" max="100" step="1" value="100">
+  <button class="vbtn" id="volUp">＋</button>
+  <input id="volVal" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="100" value="100"><span class="pct">%</span>
+  <button id="testBtn">テスト音</button>
+  <button id="kbdBtn" aria-label="キーボード操作">⌨<span class="sw">OFF</span></button>
+ </div>
+ </div>
+  <div class="startCol">
+   <button id="startBtn">スタート</button>
+   <div class="vbtns" id="viewCtrl">
+    <button id="vResume">一時停止を解除</button>
+    <button id="vStop">カウントをやめる</button>
+    <button id="vBack" style="margin-bottom:0">タイマーを見る</button>
+   </div>
+   <button id="sndBtn">合図音</button>
+   <button id="annBtn">アナウンス</button>
+   <button id="saveHere">この設定を保存</button>
+   <button id="presetBtn"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>保存した設定</button>
+  </div>
+ </div>
+</div>
+
+<!-- 今の設定を保存（名前を入れる） -->
+<div id="saveDlg"><div class="box">
+  <div class="ttl">この設定を保存</div>
+  <div class="sm" id="sdSum"></div>
+  <input id="sdName" type="text" placeholder="名前（例：朝の練習）">
+  <div class="nmErr" id="sdErr"></div>
+  <div class="btns"><button id="sdOk">保存</button></div>
+  <button id="sdCancel" aria-label="やめる">✕</button>
+</div></div>
+<div id="toast"></div>
+<div id="tip"></div>
+<!-- アナウンスの設定を保存 -->
+<div id="apSaveDlg"><div class="box">
+  <div class="ttl">アナウンスの設定を保存</div>
+  <button class="dx" id="apSaveX" aria-label="やめる">✕</button>
+  <div class="sm" id="apSaveSum"></div>
+  <input id="apName" type="text">
+  <div class="nmErr" id="apErr"></div>
+  <div class="btns"><button id="apSaveOk">保存</button></div>
+</div></div>
+<!-- 保存したアナウンスの設定 -->
+<div id="apPanel">
+  <div class="annHead">
+    <div class="headBox" style="border-color:#ff5fa8"><div class="annTitle"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>保存したアナウンスの設定</div></div>
+    <span class="grow"></span>
+    <button id="apClose" style="height:1rem;padding:0 2vw;font-size:0.45rem;font-weight:700;border:0;border-radius:0.12rem;color:#fff;background:#1e88e5;outline:none">閉じる</button>
+  </div>
+  <div id="apList"></div>
+</div>
+<!-- キーの割り当て一覧（？キー） -->
+<div id="keyHelp"><div class="box">
+  <div class="ttl">キーの割り当て</div>
+  <table>
+    <tr><th>矢印キー</th><td>項目を上下左右に移動<br><small>一時停止中は「一時停止を解除・カウントをやめる・設定を見る」を選ぶ</small></td></tr>
+    <tr><th>Enter</th><td>選んでいるボタンを押す／入力を決定</td></tr>
+    <tr><th>スペース</th><td>設定画面：スタート／カウント中：一時停止・一時停止を解除</td></tr>
+    <tr><th>Esc</th><td>開いている画面を閉じる</td></tr>
+    <tr><th>？</th><td>この一覧を表示する／閉じる（Shiftなしでも）</td></tr>
+    <tr><th>文字の入力欄</th><td>ふつうのキーボード入力／数字の欄・＋－ボタン・音量のスライダーでは ＋－キーで増減（矢印で欄から移動）</td></tr>
+  </table>
+  <div class="hint">？ か Esc で閉じる</div>
+</div></div>
+<!-- 数字の色を選ぶ -->
+<div id="colorDlg"><div class="box">
+  <div class="ttl" id="cdTitle">①の数字の色</div>
+  <button id="cdX" aria-label="閉じる">✕</button>
+  <div class="cdBody"><div class="opts" id="cdOpts"></div><canvas id="cdPrev"></canvas></div>
+  <button id="cdAll">全部の時間をこの色にする</button>
+</div></div>
+<div id="dupMsg"></div>
+<div id="undoBar"></div>
+<!-- 注意：アナウンスが重なる・時間より長い など -->
+<div id="warnDlg"><div class="box">
+  <div class="ttl">⚠ 注意</div>
+  <div class="msg" id="warnMsg"></div>
+  <button id="warnOk">わかった</button>
+</div></div>
+
+<!-- 保存した設定 -->
+<div id="presetPanel">
+  <div class="annHead">
+    <div class="headBox" style="padding-right:2vw;border-color:#ff5fa8"><div class="annTitle"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>保存した設定</div></div>
+    <span class="grow"></span>
+    <button id="pExport" class="pIO" aria-label="書き出す（ダウンロード）" data-tip="書き出す（ダウンロード）"><svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3.5 V14.5 M7 10 L12 15 L17 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15.5 V19.5 H19.5 V15.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button id="pImport" class="pIO" aria-label="読み込む（アップロード）" data-tip="読み込む（アップロード）"><svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 15 V4 M7 8.5 L12 3.5 L17 8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15.5 V19.5 H19.5 V15.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <input id="pFile" type="file" accept=".json,application/json" style="display:none">
+    <button id="presetClose" style="height:1rem;padding:0 2vw;font-size:0.45rem;font-weight:700;border:0;border-radius:0.12rem;color:#fff;background:#1e88e5;outline:none">閉じる</button>
+  </div>
+  <div id="presetMsg"></div>
+  <div id="presetList"></div>
+</div>
+
+<!-- 合図音設定 -->
+<div id="sndPanel">
+  <div class="annHead">
+    <div class="headBox" style="border-color:#2e7d32"><div class="annTitle gTitle">合図音</div>
+    <div class="onoff" id="sndOnOff"><button data-on="1" data-kfirst="1">あり</button><button data-on="0">なし</button></div></div>
+    <button id="sndManBtn" aria-label="マニュアル"><svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8 H16 M9 12 H16 M9 16 H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 7 H7 M3 12 H7 M3 17 H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <span class="grow"></span>
+    <button id="sndClose">閉じる</button>
+  </div>
+  <div id="sndManual">
+    <p>合図音は、トップ画面で選択した「時間①②③～」ごとに、残り○秒になったら鳴ります。</p>
+    <p class="sub">例えば、①1:00 ②0:30 を3回リピートする設定の場合、①②×3回＝合計6回、合図音が鳴ります。</p>
+    <button id="sndManClose">閉じる</button>
+  </div>
+  <div id="sndList"></div>
+  <button id="sndAdd">＋ 増やす</button>
+</div>
+
+<!-- アナウンス設定 -->
+<div id="annPanel">
+  <div class="annHead">
+    <div id="annMyMark" title=""><svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span id="annMyName"></span>
+    <div class="headBox" style="border-color:#2e7d32"><div class="annTitle gTitle">アナウンス</div>
+    <div class="onoff" id="annOnOff"><button data-on="1" data-kfirst="1">あり</button><button data-on="0">なし</button></div></div>
+    <span class="grow"></span>
+    <button id="annClear">全部消す</button>
+    <button id="annClose">閉じる</button>
+  </div>
+  <div id="annList"></div>
+  <div class="annFoot"><button id="annAdd">＋ 増やす</button><span class="grow"></span>
+    <button id="apSaveBtn">この設定を保存</button><button id="apListBtn"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>保存した設定</button></div>
+  <div id="annMsg"></div>
+</div>
+
+<!-- 実行画面 -->
+<div id="run" class="screen">
+  <canvas id="cv"></canvas>
+  <button id="infoBtn" aria-label="設定を表示"></button>
+  <button id="timeBtn" aria-label="経過・残り・合計の時間"></button>
+  <button id="runVolBtn" aria-label="音量"></button>
+  <div id="runVolPanel">
+    <button class="rvb" id="rvDown">－</button>
+    <input id="rvSlider" type="range" min="0" max="100" step="1">
+    <button class="rvb" id="rvUp">＋</button>
+    <span id="rvVal">100%</span>
+  </div>
+  <div id="state"></div>
+  <div id="bigWord"></div>
+  <button id="backBtn">もどる</button>
+  <div id="ctrl">
+    <button id="pauseBtn">一時停止</button>
+    <button id="stopBtn">カウントをやめる</button>
+    <button id="retBtn">カウントに戻る</button>
+    <button id="viewBtn">設定を見る</button>
+  </div>
+</div>
+
+
+<div id="rotate">横向きにしてください<div style="font-size:4.5vw;color:#aaa;margin-top:0.4rem">iPhoneは「画面縦向きのロック」をオフに</div></div>
+
+<script>
+(function () {
+  "use strict";
+  // 画面の大きさの基準を決める（16:9 より細長くない画面では横幅を基準にする）
+  function fitRoot() {
+    var w = window.innerWidth, h = window.innerHeight;
+    var base = Math.min(h, w * 9 / 16);                 // 16:9 に収まる高さ
+    if (h > w) base = Math.min(w, h * 9 / 16);          // 縦向きのときの案内用
+    document.documentElement.style.fontSize = (base / 10) + "px";
+  }
+  fitRoot();
+  window.addEventListener("resize", fitRoot);
+  window.addEventListener("orientationchange", function () { setTimeout(fitRoot, 300); });
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  // ---------- 設定 ----------
+  var cfg = { min: 1, sec: 0, rep: 3, vol: 100, boost: false, ann: [], snd: [], sndOn: true, annOn: true, presets: [], annPresets: [], kbd: false,
+              mode: "same",
+              list: [{ m: 1, s: 0 }, { m: 3, s: 0 }, { m: 5, s: 0 }, { m: 2, s: 0 }], listRep: 1 };
+  try {
+    var saved = JSON.parse(localStorage.getItem("repeatTimerCfg") || "null");
+    if (saved && typeof saved.min === "number") { for (var sk in saved) cfg[sk] = saved[sk]; }
+  } catch (e) {}
+
+  var LIMIT = { min: [0, 99], sec: [0, 59], rep: [0, 99] };
+  var INPUT = { min: "vMin", sec: "vSec", rep: "vRep" };
+
+  function clamp(k, v) {
+    v = parseInt(v, 10);
+    if (isNaN(v)) v = cfg[k];
+    return Math.max(LIMIT[k][0], Math.min(LIMIT[k][1], v));
+  }
+  function render() {
+    $("vMin").value = pad(cfg.min);
+    $("vSec").value = pad(cfg.sec);
+    $("vRep").value = cfg.rep;
+  }
+  function change(k, d) {
+    var lo = LIMIT[k][0], hi = LIMIT[k][1], v = cfg[k] + d;
+    if (k === "rep") v = Math.max(lo, Math.min(hi, v));
+    else v = v > hi ? lo : (v < lo ? hi : v);   // 分・秒は一周する
+    cfg[k] = v;
+    render();
+  }
+
+  // ＋－ボタン：タップで1つ、長押しで連続（秒は長押し中5秒ずつ）
+  var holdTimer = null, holdRepeat = null;
+  function stopHold() { clearTimeout(holdTimer); clearInterval(holdRepeat); holdTimer = holdRepeat = null; }
+  var btns = document.querySelectorAll(".btn");
+  for (var i = 0; i < btns.length; i++) {
+    (function (b) {
+      var k = b.getAttribute("data-k"), d = parseInt(b.getAttribute("data-d"), 10);
+      var fast = (k === "sec") ? d * 5 : d;
+      function down(ev) {
+        ev.preventDefault();
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        change(k, d);
+        stopHold();
+        holdTimer = setTimeout(function () {
+          holdRepeat = setInterval(function () { change(k, fast); }, 130);
+        }, 450);
+      }
+      b.addEventListener("touchstart", down, false);
+      b.addEventListener("mousedown", down, false);
+      b.addEventListener("touchend", stopHold, false);
+      b.addEventListener("touchcancel", stopHold, false);
+      b.addEventListener("mouseup", stopHold, false);
+      b.addEventListener("mouseleave", stopHold, false);
+    })(btns[i]);
+  }
+
+  // 数字欄：タップしてキーボードで直接入力
+  for (var key in INPUT) {
+    (function (k) {
+      var el = $(INPUT[k]);
+      el.addEventListener("focus", function () {
+        var self = this;
+        setTimeout(function () { try { self.select(); } catch (e) {} }, 0);
+      });
+      function commit() { cfg[k] = clamp(k, el.value); render(); }
+      el.addEventListener("change", commit);
+      el.addEventListener("blur", commit);
+      el.addEventListener("keydown", function (e) { if (e.keyCode === 13) el.blur(); });
+    })(key);
+  }
+  render();
+
+  // ---------- 横向き固定・全画面 ----------
+  function goFullLandscape() {
+    var de = document.documentElement;
+    var req = de.requestFullscreen || de.webkitRequestFullscreen;
+    var p = null;
+    try { if (req && !(document.fullscreenElement || document.webkitFullscreenElement)) p = req.call(de); } catch (e) {}
+    function lock() {
+      try {
+        if (screen.orientation && screen.orientation.lock)
+          screen.orientation.lock("landscape")["catch"](function () {});
+      } catch (e) {}
+    }
+    if (p && p.then) p.then(lock, lock); else setTimeout(lock, 300);
+  }
+
+  // ---------- 音 ----------
+  // 音の流れ： 各音 → (ブースト時は割れる手前まで押し上げ) → 音量スライダー → スピーカー
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ctx = null, master = null, clipper = null, longNodes = null;
+  function saveCfg() {
+    try { localStorage.setItem("repeatTimerCfg", JSON.stringify(cfg)); } catch (e) {}
+    if (window.__updateTotals) window.__updateTotals();
+    if (window.__updateMy) window.__updateMy();
+    if (window.__updateAnnMark) window.__updateAnnMark();
+    if (window.__updateClr) window.__updateClr();
+  }
+  function initAudio() {
+    // iPhone：消音スイッチがオンでも鳴らす（iOS 17以降）
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    if (!ctx && AC) {
+      ctx = new AC();
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+      // ブースト用：はみ出た分を切り落として、常に最大振幅で鳴らす
+      clipper = ctx.createWaveShaper();
+      var n = 1024, curve = new Float32Array(n);
+      for (var i = 0; i < n; i++) { var x = i / (n - 1) * 2 - 1; curve[i] = Math.max(-1, Math.min(1, x * 3)); }
+      clipper.curve = curve;
+      clipper.connect(master);
+    }
+    // 一時停止中は音を止めたままにする（再開ボタンで続きから鳴る）
+    if (ctx && ctx.state === "suspended" && ctx.resume && !(running && paused)) ctx.resume();
+    applyVolume();
+  }
+  function applyVolume() {
+    if (master) master.gain.value = cfg.vol / 100;
+    if (pv) pv.master.gain.value = cfg.vol / 100;
+  }
+  // 試し聞き用（一時停止中でも鳴るように、タイマー本体とは別に鳴らす）
+  var pv = null;
+  function preview(fn) {
+    initAudio();
+    if (!(running && paused)) { fn(); return; }
+    if (!pv && AC) {
+      var c = new AC(), m = c.createGain(), cl = c.createWaveShaper();
+      m.connect(c.destination); cl.curve = clipper ? clipper.curve : null; cl.connect(m);
+      pv = { ctx: c, master: m, clipper: cl };
+    }
+    if (!pv) return;
+    if (pv.ctx.state === "suspended" && pv.ctx.resume) pv.ctx.resume();
+    pv.master.gain.value = cfg.vol / 100;
+    var save = { ctx: ctx, master: master, clipper: clipper };
+    ctx = pv.ctx; master = pv.master; clipper = pv.clipper;
+    try { fn(); } finally { ctx = save.ctx; master = save.master; clipper = save.clipper; }
+  }
+  // 1つの音を作る（音の高さ freq はそのまま。ブースト時は倍音を足して鋭く・最大音量に）
+  function makeTone(t, freq) {
+    var g = ctx.createGain();
+    var o = ctx.createOscillator();
+    o.type = "square"; o.frequency.value = freq;
+    o.connect(g);
+    var oscs = [o];
+    if (cfg.boost) {
+      var o2 = ctx.createOscillator(), g2 = ctx.createGain();
+      o2.type = "sawtooth"; o2.frequency.value = freq * 2; g2.gain.value = 0.6;
+      o2.connect(g2); g2.connect(g);
+      oscs.push(o2);
+      g.connect(clipper);
+    } else {
+      g.connect(master);
+    }
+    for (var i = 0; i < oscs.length; i++) oscs[i].start(t);
+    return { g: g, oscs: oscs };
+  }
+  var PEAK = 1.0;   // アプリ内の音の大きさは最大
+  function beep(delay, dur, freq) {
+    if (!ctx) return;
+    var t = ctx.currentTime + delay;
+    var nd = makeTone(t, freq);
+    nd.g.gain.setValueAtTime(0.0001, t);
+    nd.g.gain.linearRampToValueAtTime(PEAK, t + 0.005);
+    nd.g.gain.setValueAtTime(PEAK, t + dur - 0.01);
+    nd.g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    for (var i = 0; i < nd.oscs.length; i++) nd.oscs[i].stop(t + dur + 0.02);
+  }
+  function pipi(delay, freq) {          // 「ピピッ」1回分
+    beep(delay, 0.09, freq);
+    beep(delay + 0.13, 0.09, freq);
+  }
+  // 最後の1秒〜0秒：つながった「ピー」
+  function startLong(sec) {
+    if (!ctx || sec <= 0) return;
+    stopLong();
+    var t = ctx.currentTime;
+    var nd = makeTone(t, 1320);
+    nd.g.gain.setValueAtTime(0.0001, t);
+    nd.g.gain.linearRampToValueAtTime(PEAK, t + 0.005);
+    nd.g.gain.setValueAtTime(PEAK, t + Math.max(0.01, sec - 0.01));
+    nd.g.gain.linearRampToValueAtTime(0.0001, t + sec);
+    for (var i = 0; i < nd.oscs.length; i++) nd.oscs[i].stop(t + sec + 0.02);
+    longNodes = nd;
+  }
+  // 合図音の一時停止／再開／取り消し
+  function pauseAudio() { try { if (ctx && ctx.suspend) ctx.suspend(); } catch (e) {} }
+  function cancelAudio() {                 // 予定されている音を全部取り消す
+    try { if (ctx && ctx.close) ctx.close(); } catch (e) {}
+    ctx = null; master = null; clipper = null; longNodes = null;
+  }
+  function stopLong() {
+    if (longNodes) {
+      try { longNodes.g.gain.cancelScheduledValues(ctx.currentTime); longNodes.g.gain.setValueAtTime(0.0001, ctx.currentTime); } catch (e) {}
+      for (var i = 0; i < longNodes.oscs.length; i++) { try { longNodes.oscs[i].stop(); } catch (e) {} }
+    }
+    longNodes = null;
+  }
+  // スタート音：「ポ・ピーン」
+  function startSound() {
+    beep(0, 0.12, 784);
+    beep(0.15, 0.45, 1568);
+  }
+  // 残り秒数が変わった瞬間に呼ぶ（ms = 0秒までの残りミリ秒）
+  // ベースは無音。鳴るのは「合図音」と「アナウンス」で自分で設定したものだけ
+  var BASE_SOUND = false;
+  function soundFor(s, ms) {
+    announceAt(s);
+    customAt(s);
+    if (!BASE_SOUND) return;
+    if (s >= 60 && s % 60 === 0 && s < total) {
+      pipi(0, 1047); pipi(0.55, 1047); pipi(1.1, 1047);   // ○分前：ピピッ×3（スタート直後は鳴らさない）
+    } else if (s <= 10 && s >= 6) {
+      beep(0, 0.18, 880);                                  // 10〜6秒：1秒に1回 ピッ
+    } else if (s <= 5 && s >= 3) {
+      pipi(0, 1320); pipi(0.5, 1320);                      // 5〜3秒：ピピッ ピピッ
+    } else if (s <= 2 && s >= 1) {
+      if (!longNodes) startLong(ms / 1000);                // 2秒前〜0秒：ピーーー（0秒で止まる）
+    }
+  }
+
+  // ---------- 音量・ブースト・テスト音 ----------
+  var volEl = $("vol"), testEl = $("testBtn");
+  cfg.boost = false;                     // ブースト機能はなし
+  function renderSound() {
+    volEl.value = cfg.vol;
+    $("volVal").value = cfg.vol;
+  }
+  function onVol() {
+    cfg.vol = Math.max(0, Math.min(100, parseInt(volEl.value, 10) || 0));
+    $("volVal").value = cfg.vol;
+    applyVolume(); saveCfg();
+  }
+  // 音量の＋－：タップで1％、長押しで5％ずつ連続
+  function volStep(d) {
+    cfg.vol = Math.max(0, Math.min(100, cfg.vol + d));
+    renderSound(); applyVolume(); saveCfg();
+  }
+  var vHold = null, vRep = null;
+  function vStop() { clearTimeout(vHold); clearInterval(vRep); vHold = vRep = null; }
+  [["volDown", -1], ["volUp", 1]].forEach(function (pair) {
+    var b = $(pair[0]), d = pair[1];
+    function down(ev) {
+      ev.preventDefault();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      volStep(d); vStop();
+      vHold = setTimeout(function () { vRep = setInterval(function () { volStep(d * 5); }, 130); }, 450);
+    }
+    b.addEventListener("touchstart", down, false);
+    b.addEventListener("mousedown", down, false);
+    ["touchend", "touchcancel", "mouseup", "mouseleave"].forEach(function (ev) { b.addEventListener(ev, vStop, false); });
+  });
+  // ％の数字を直接入力
+  var volIn = $("volVal");
+  volIn.addEventListener("focus", function () { var el = this; setTimeout(function () { try { el.select(); } catch (e) {} }, 0); });
+  function commitVol() {
+    var v = parseInt(volIn.value, 10);
+    if (isNaN(v)) v = cfg.vol;
+    cfg.vol = Math.max(0, Math.min(100, v));
+    renderSound(); applyVolume(); saveCfg();
+  }
+  volIn.addEventListener("change", commitVol);
+  volIn.addEventListener("blur", commitVol);
+  volIn.addEventListener("keydown", function (e) { if (e.keyCode === 13) volIn.blur(); });
+  volEl.addEventListener("input", onVol);
+  volEl.addEventListener("change", onVol);
+  // テスト音：押すとアラーム音をくり返し鳴らす（もう一度押すか15秒で止まる）
+  var testTimer = null, testStop = null;
+  function stopTest() {
+    clearInterval(testTimer); clearTimeout(testStop); testTimer = testStop = null;
+    testEl.className = ""; testEl.textContent = "テスト音";
+  }
+  function testOnce() { preview(function () { beep(0, 0.18, 880); pipi(0.5, 1320); pipi(1.0, 1320); }); }
+  testEl.addEventListener("click", function () {
+    if (testTimer) { stopTest(); return; }
+    initAudio();
+    testOnce();
+    testTimer = setInterval(testOnce, 1600);
+    testStop = setTimeout(stopTest, 15000);
+    testEl.className = "on"; testEl.textContent = "■ 停止";
+  });
+  renderSound();
+
+  // ---------- くり返しの方式（リピート同じ時間／リピート違う時間／ランダム自由設定） ----------
+  function holdBtn(el, fn) {          // タップで1回、長押しで速く連続
+    var t1 = null, t2 = null;
+    function stop() { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; }
+    function down(ev) {
+      ev.preventDefault();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      fn(1); stop();
+      t1 = setTimeout(function () { t2 = setInterval(function () { fn(5); }, 130); }, 450);
+    }
+    el.addEventListener("touchstart", down, false); el.addEventListener("mousedown", down, false);
+    ["touchend", "touchcancel", "mouseup", "mouseleave"].forEach(function (e) { el.addEventListener(e, stop, false); });
+  }
+  function bindNum(el, lo, hi, get, set) {
+    el.addEventListener("focus", function () { setTimeout(function () { try { el.select(); } catch (e) {} }, 0); });
+    function commit() { var v = parseInt(el.value, 10); set(isNaN(v) ? get() : Math.max(lo, Math.min(hi, v))); }
+    el.addEventListener("change", commit); el.addEventListener("blur", commit);
+    el.addEventListener("keydown", function (e) { if (e.keyCode === 13) el.blur(); });
+  }
+  // 色（時間ごとに選べる）：背景・数字・左上の文字
+  var NAVY = "#123a73";
+  var BG_COLORS = [
+    { k: "black", name: "黒", v: "#000000" },
+    { k: "navy", name: "紺（卓球台の色）", v: NAVY },
+    { k: "green", name: "蛍光緑", v: "#39ff14" },
+    { k: "yellow", name: "蛍光黄", v: "#e6ff00" }
+  ];                                           // 背景のオレンジはやめた（前の設定でオレンジだったものは黒に）
+  var FG_COLORS = [
+    { k: "white", name: "白", v: "#ffffff" },
+    { k: "black", name: "黒", v: "#000000" },
+    { k: "green", name: "蛍光緑", v: "#39ff14" },
+    { k: "yellow", name: "蛍光黄", v: "#f5ff00" },
+    { k: "orange", name: "蛍光オレンジ", v: "#ff7a00" }
+  ];
+  var LC_COLORS = [
+    { k: "lblue", name: "明るい青", v: "#40c4ff" },
+    { k: "orange", name: "オレンジ", v: "#ff9100" },
+    { k: "white", name: "白", v: "#ffffff" },
+    { k: "black", name: "黒", v: "#000000" }
+  ];
+  // 前の版の「色」（1つで背景と数字を決めていた）からの読みかえ
+  var OLD_C = { white: ["black", "white"], green: ["black", "green"], yellow: ["black", "yellow"], orange: ["black", "orange"], red: ["black", "red"],
+                bgGreen: ["green", "black"], bgYellow: ["yellow", "black"], bgOrange: ["orange", "black"], bgNavy: ["navy", "white"] };
+  function pal(list, k, def) { for (var i = 0; i < list.length; i++) if (list[i].k === k) return list[i]; return def ? pal(list, def) : list[0]; }
+  function itBg(it) { var b = it.bg || (OLD_C[it.c] || OLD_C.white)[0]; for (var i = 0; i < BG_COLORS.length; i++) if (BG_COLORS[i].k === b) return b; return "black"; }
+  function itFg(it) {                          // 背景が変わって見えにくくなった数字の色は、白に
+    var f = it.fg || (OLD_C[it.c] || OLD_C.white)[1];
+    return fgOK(itBg(it), f) ? f : (fgOK(itBg(it), "white") ? "white" : bestFg(itBg(it)));
+  }
+  function autoLc(bg, fg) {                    // おまかせ：明るい青（緑のときはオレンジ）。選べない色ならその次
+    var pref = (bg === "green" || fg === "green") ? ["orange", "lblue", "white", "black"] : ["lblue", "orange", "white", "black"];
+    for (var i = 0; i < pref.length; i++) if (lcOK(bg, pref[i], fg)) return pref[i];
+    return "white";
+  }
+  function itLc(it) { var bg = itBg(it), fg = itFg(it); return (it.lc && lcOK(bg, it.lc, fg)) ? it.lc : autoLc(bg, fg); }
+  function bgHex(it) { return pal(BG_COLORS, itBg(it), "black").v; }
+  function fgHex(it) { return pal(FG_COLORS, itFg(it), "white").v; }
+  function lcHex(it) { return pal(LC_COLORS, itLc(it), "lblue").v; }
+  // 見やすさ（明るさの差）：背景と数字の組み合わせで、見えにくいものは選べないようにする
+  function lum(hex) {
+    var v = [1, 3, 5].map(function (i) { var c = parseInt(hex.substr(i, 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+  function contrast(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  var MIN_CONTRAST = 3.5;
+  function fgOK(bgK, fgK) { return contrast(pal(BG_COLORS, bgK, "black").v, pal(FG_COLORS, fgK, "white").v) >= MIN_CONTRAST; }
+  function bestFg(bgK) {                       // その背景でいちばん見やすい数字の色
+    var b = null, bc = 0;
+    for (var i = 0; i < FG_COLORS.length; i++) { var c = contrast(pal(BG_COLORS, bgK, "black").v, FG_COLORS[i].v); if (c > bc) { bc = c; b = FG_COLORS[i].k; } }
+    return b;
+  }
+  function rgbDist(a, b) { var d = 0; for (var i = 1; i < 7; i += 2) { var x = parseInt(a.substr(i, 2), 16) - parseInt(b.substr(i, 2), 16); d += x * x; } return Math.sqrt(d); }
+  function lcOK(bgK, lcK, fgK) {               // 背景と似た色、数字と同じ色の文字は出さない
+    var bv = pal(BG_COLORS, bgK, "black").v, lv = pal(LC_COLORS, lcK, "lblue").v, dd = rgbDist(bv, lv);
+    if (dd < 150 || (contrast(bv, lv) < 1.25 && dd < 270)) return false;   // 背景と似ている
+    if (lcK === "lblue" && (bgK === "navy" || bgK === "green")) return false;  // 紺・緑の背景に明るい青は出さない
+    return !(fgK && lcK === fgK);
+  }
+  var CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  function timeRow(item, label, onDel, onAdd, arr) {
+    var row = document.createElement("div"); row.className = "tRow";
+    row.innerHTML = '<span class="tl">' + label + '</span>' +
+      '<button class="pm md">－</button><input class="im" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm mu">＋</button><span class="colon">:</span>' +
+      '<button class="pm sd">－</button><input class="is" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm su">＋</button>' +
+      '<button class="cdot">色を選ぶ</button>' +   // 時間が多くて2列のときは「色」だけ
+            (onAdd ? '<button class="addT">時間を追加</button>' : '') +
+      (onDel ? '<button class="del">✕</button>' : '');
+    var im = row.querySelector(".im"), is = row.querySelector(".is");
+    var dot = row.querySelector(".cdot");
+    var colonEl = row.querySelector(".colon");
+    function paint() {
+      im.value = pad(item.m || 0); is.value = pad(item.s || 0);
+      var cv = fgHex(item), bg = itBg(item) === "black" ? null : bgHex(item);   // 選んだ色を、設定画面の時間の文字にも
+      var vis2 = cv === "#000000" ? (bg || "#888") : cv;   // 黒い数字のときは背景色、それ以外は数字の色で見せる
+      dot.style.background = bg || "#111"; dot.style.color = cv; dot.style.borderColor = vis2;
+      im.style.color = cv; is.style.color = cv; colonEl.style.color = vis2;
+      im.style.background = bg || ""; is.style.background = bg || "";   // 蛍光色の背景：入力欄も背景色＋黒い数字
+    }
+    dot.addEventListener("click", function () { openColorDlg(item, label, arr || [item], paint); });
+    function addMin(d) { item.m = Math.max(0, Math.min(99, (item.m || 0) + d)); saveCfg(); paint(); }
+    function addSec(d) {                     // 秒は 59→0、0→59 で一周（分は変わらない）
+      item.s = (((item.s || 0) + d) % 60 + 60) % 60; saveCfg(); paint();
+    }
+    holdBtn(row.querySelector(".md"), function (k) { addMin(-1); });
+    holdBtn(row.querySelector(".mu"), function (k) { addMin(1); });
+    holdBtn(row.querySelector(".sd"), function (k) { addSec(-k); });
+    holdBtn(row.querySelector(".su"), function (k) { addSec(k); });
+    bindNum(im, 0, 99, function () { return item.m || 0; }, function (v) { item.m = v; saveCfg(); paint(); });
+    bindNum(is, 0, 59, function () { return item.s || 0; }, function (v) { item.s = v; saveCfg(); paint(); });
+    if (onDel) row.querySelector(".del").addEventListener("click", onDel);
+    if (onAdd) row.querySelector(".addT").addEventListener("click", onAdd);
+    paint();
+    return row;
+  }
+  function repRow(key, onAdd) {
+    var row = document.createElement("div"); row.className = "tRow fitRow";
+    row.innerHTML = '<span class="tl" style="color:#ff9100">回</span>' +
+      '<button class="pm d">－</button><input class="ir" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm u2">＋</button>' +
+      '';
+    if (onAdd) row.appendChild(onAdd);       // 増やす・減らす・全部消す のボタン
+    var ir = row.querySelector(".ir");
+    function paint() { ir.value = cfg[key]; }
+    function add(d) { cfg[key] = Math.max(0, Math.min(99, cfg[key] + d)); saveCfg(); paint(); }
+    holdBtn(row.querySelector(".d"), function (k) { add(-k); });
+    holdBtn(row.querySelector(".u2"), function (k) { add(k); });
+    bindNum(ir, 0, 99, function () { return cfg[key]; }, function (v) { cfg[key] = v; saveCfg(); paint(); });
+    paint();
+    return row;
+  }
+  function listEditor(box, arr, repKey) {
+    var sc = document.createElement("div"); sc.className = "tScroll";
+    function addTime() {                     // 最後の行の「追加」：同じ時間の行を増やす
+      var last = arr[arr.length - 1] || { m: 1, s: 0 };
+      arr.push({ m: last.m, s: last.s }); saveCfg(); buildList();
+      var sc2 = $("fList").querySelector(".tScroll"); if (sc2) sc2.scrollTop = 99999;
+    }
+    arr.forEach(function (it, i) {
+      sc.appendChild(timeRow(it, CIRC.charAt(i) || String(i + 1), arr.length > 1 ? function () {
+        arr.splice(i, 1); saveCfg(); buildList();
+      } : null, null, arr));
+    });
+    box.appendChild(sc);
+    // 増やす・減らす・全部消す
+    function makeGrp() {
+      var g = document.createElement("div"); g.className = "addGrp";
+      g.innerHTML = '<button class="gAdd">時間を増やす</button><button class="gSub">減らす</button><button class="gClr">全部消す</button>';
+      var bAdd = g.querySelector(".gAdd"), bSub = g.querySelector(".gSub"), bClr = g.querySelector(".gClr");
+      if (arr.length >= 20) bAdd.className += " off";
+      if (arr.length <= 1) bSub.className += " off";
+      function isClear() { return arr.length <= 1 && !(arr[0] && ((arr[0].m || 0) || (arr[0].s || 0))) && (!repKey || cfg[repKey] === 0); }
+      window.__updateClr = function () {     // 時間や回数を変えたら「全部消す」を押せるように
+        if (!document.body.contains(bClr)) return;
+        bClr.className = isClear() ? "gClr off" : "gClr";
+      };
+      if (isClear()) bClr.className += " off";
+      bAdd.addEventListener("click", function () { if (arr.length < 20) addTime(); });
+      bSub.addEventListener("click", function () {            // 最後の時間を1つ消す
+        if (arr.length > 1) { arr.pop(); saveCfg(); buildList(); }
+      });
+      bClr.addEventListener("click", function () {            // ①だけ残して全部消す（元に戻せる）
+        if (isClear()) return;               // 全部消す：①だけ残して 00:00、回数は 0
+        var backup = JSON.parse(JSON.stringify(arr)), repB = repKey ? cfg[repKey] : null;
+        arr.splice(1, arr.length - 1);
+        if (arr[0]) { arr[0].m = 0; arr[0].s = 0; } else arr.push({ m: 0, s: 0 });
+        if (repKey) cfg[repKey] = 0;
+        saveCfg(); buildList();
+        showUndo(function () { arr.length = 0; for (var q = 0; q < backup.length; q++) arr.push(backup[q]); if (repKey) cfg[repKey] = repB; saveCfg(); buildList(); });
+      });
+      return g;
+    }
+    // 時間の行のすぐ下：増やす・減らす・全部消す
+    var gRow = document.createElement("div"); gRow.className = "tRow grpRow";
+    gRow.appendChild(makeGrp());
+    box.appendChild(gRow);
+    if (repKey) {                             // その下にオレンジの線、そして回数
+      var line = document.createElement("div"); line.className = "sepLine";
+      box.appendChild(line);
+      box.appendChild(repRow(repKey, null));
+    }
+    if (box.offsetParent) { fitRows(); alignAdd(); }   // すぐに大きさを決める（ちらつき防止）
+    setTimeout(function () { fitRows(); alignAdd(); }, 0);
+  }
+  // 「全部消す」のあと、少しの間「元に戻す」を出す
+  var undoT = null;
+  function showUndo(fn) {
+    var u = $("undoBar");
+    u.innerHTML = '<span class="ux">✕</span>全部消しました<button>元に戻す</button>';
+    u.style.display = "block";
+    u.querySelector("button").onclick = function () { clearTimeout(undoT); u.style.display = "none"; fn(); };
+    u.querySelector(".ux").onclick = function () { clearTimeout(undoT); u.style.display = "none"; };   // 右上の×で閉じる
+    clearTimeout(undoT); undoT = setTimeout(function () { u.style.display = "none"; }, 3000);   // 3秒で消える
+  }
+  // 「時間を追加」の右端を、①の✕の右端にそろえる
+  function alignAdd() {
+    var box = $("fList"), cols = box.querySelectorAll(".tScroll .tCol"), btn = box.querySelector(".addGrp");
+    var first = cols.length ? cols[cols.length - 1].querySelector(".tRow") : box.querySelector(".tScroll .tRow");   // 2列のときは右の列
+    if (!first || !btn || !btn.offsetParent) return;
+    var del = first.querySelector(".del"), sr;
+    if (del) sr = del.getBoundingClientRect();                 // ①の✕の右端
+    else {                                                      // ✕が無いとき：行の右端
+      var fr0 = first.getBoundingClientRect();
+      sr = { right: fr0.right - (parseFloat(getComputedStyle(first).paddingRight) || 0) };
+    }
+    var row = btn.parentNode;
+    // リピート：回の＋ボタンから少し離したところから✕の右端まで、余白いっぱいにボタンを広げる
+    btn.style.width = "";
+    var u2 = row.querySelector(".u2");
+    if (!u2) {                                // 自分の行にあるとき：行の左から✕の右端まで広げる
+      var rl = row.getBoundingClientRect().left + (parseFloat(getComputedStyle(row).paddingLeft) || 0);
+      var w0 = sr.right - rl;
+      if (w0 > btn.offsetWidth) btn.style.width = w0 + "px";
+    } else {
+      var gap = 0.35 * (parseFloat(row.style.fontSize) || 36);
+      var w = sr.right - (u2.getBoundingClientRect().right + gap);
+      if (w > btn.offsetWidth) btn.style.width = w + "px";
+    }
+    var rr = row.getBoundingClientRect();
+    var padR = parseFloat(getComputedStyle(row).paddingRight) || 0;
+    btn.style.marginRight = Math.max(-padR, rr.right - padR - sr.right) + "px";   // 行の枠の中でできるだけ✕の右端に合わせる
+  }
+  // 数字の色を選ぶ画面
+  var cdItem = null, cdArr = null, cdPaint = null;
+  function openColorDlg(item, label, arr, paint) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    cdItem = item; cdArr = arr; cdPaint = paint;
+    $("cdTitle").textContent = label + "の色";
+    renderColorDlg();
+    $("colorDlg").className = "on";
+  }
+  function renderColorDlg() {                 // 背景・数字・左上の文字 を、それぞれ選ぶ
+    var it = cdItem, bgv = bgHex(it), h = "";
+    function row(title, list, cur, kind) {
+      var r = '<div class="cRow"><span class="cLab">' + title + '</span>';
+      for (var i = 0; i < list.length; i++) {
+        var d = list[i], st, inner;
+        if (kind === "bg") { st = "background:" + d.v + ";" + (d.k === "navy" ? "box-shadow: inset 0 0 0 0.035rem #fff;" : ""); inner = ""; }
+        else if (kind === "fg") { st = "background:" + bgv + ";color:" + d.v; inner = "0"; }
+        else { var sh = d.v === "#000000" ? "#fff" : "#000"; st = "background:" + bgv + ";color:" + d.v + ";text-shadow: 0 0 0.04rem " + sh + ", 0 0 0.04rem " + sh; inner = "分"; }
+        r += '<button class="opt ' + kind + (cur === d.k ? " sel" : "") + '" data-kind="' + kind + '" data-k="' + d.k + '" aria-label="' + title + "：" + d.name + '" style="' + st + '">' + inner + '</button>';
+      }
+      return r + '</div>';
+    }
+    h += row("背景", BG_COLORS, itBg(it), "bg");
+    h += row("数字", FG_COLORS.filter(function (d) { return fgOK(itBg(it), d.k); }), itFg(it), "fg");   // 見えにくい数字の色は出さない
+    h += row("左上の文字", LC_COLORS.filter(function (d) { return lcOK(itBg(it), d.k, itFg(it)); }), itLc(it), "lc");   // 紺・黒の背景に黒い文字は出さない
+    var foc = document.activeElement, fk = foc && foc.getAttribute ? foc.getAttribute("data-kind") + ":" + foc.getAttribute("data-k") : "";
+    $("cdOpts").innerHTML = h;
+    setTimeout(function () { drawPreview(it); }, 0);
+    var bs = $("cdOpts").querySelectorAll(".opt");
+    for (var j = 0; j < bs.length; j++) {
+      bs[j].addEventListener("click", function () {
+        var kd = this.getAttribute("data-kind"), k = this.getAttribute("data-k");
+        if (cdItem.c && !cdItem.bg) { cdItem.bg = itBg(cdItem); cdItem.fg = itFg(cdItem); }   // 前の版の色を、背景・数字に分ける
+        delete cdItem.c;
+        cdItem[kd] = k;
+        if (kd === "bg" && !fgOK(k, itFg(cdItem))) cdItem.fg = bestFg(k);
+        if (cdItem.lc && !lcOK(itBg(cdItem), cdItem.lc, itFg(cdItem))) delete cdItem.lc;   // 左上の文字が見えにくい・数字と同じ色になったら、おまかせの色に   // 背景を変えて数字が見えにくくなったら、見やすい色に変える
+        saveCfg(); cdPaint(); renderColorDlg();
+      });
+      if (fk && (bs[j].getAttribute("data-kind") + ":" + bs[j].getAttribute("data-k")) === fk) bs[j].focus();   // 選び直しても、カーソルはそのまま
+    }
+  }
+  // 完成イメージ：選んだ背景・数字・左上の文字で、カウント画面を小さく描く
+  function drawPreview(it) {
+    var cvp = $("cdPrev"); if (!cvp || !cvp.offsetWidth) return;
+    var root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 36;
+    cvp.style.width = ""; cvp.style.flex = "1 1 0"; cvp.style.webkitFlex = "1 1 0";       // まず空いている幅を測る
+    var Wc = Math.min(cvp.offsetWidth, Math.round(root * 3.3 * 16 / 9));                  // 完成イメージは小さめ（高さ3.3rem まで）
+    cvp.style.flex = "none"; cvp.style.webkitFlex = "none"; cvp.style.width = Wc + "px";
+    var dpr = window.devicePixelRatio || 1, Hc = Math.round(Wc * 9 / 16);
+    cvp.style.height = Hc + "px"; cvp.width = Math.round(Wc * dpr); cvp.height = Math.round(Hc * dpr);
+    var c = cvp.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var bg = bgHex(it), fg = fgHex(it), lc = lcHex(it), navy = itBg(it) === "navy";
+    c.fillStyle = bg; c.fillRect(0, 0, Wc, Hc);
+    var top = Hc * 0.02, left = Wc * 0.01, aw = Wc * 0.98, ah = Hc * 0.96;
+    if (navy) {
+      var ew = Math.max(2, Math.round(Hc * 0.022));
+      c.fillStyle = "#fff"; c.fillRect(0, 0, Wc, ew); c.fillRect(0, Hc - ew, Wc, ew); c.fillRect(0, 0, ew, Hc); c.fillRect(Wc - ew, 0, ew, Hc);
+      var inn = ew * 2.2; top += inn; left += inn; aw -= inn * 2; ah -= inn * 2;
+    }
+    var mt = getMetric(), LW = 3, cell = mt.W + LW, colon = mt.W * 0.34;
+    var sx = aw / (cell * 4 + colon), sy = ah / (mt.H + LW), chs = ["0", "3", "0", "0"], xs = [cell * 0.5, cell * 1.5, cell * 2.5 + colon, cell * 3.5 + colon];
+    c.save(); c.translate(left, top); c.scale(sx, sy);
+    c.font = FONT; c.textAlign = "center"; c.textBaseline = "alphabetic"; c.fillStyle = fg; c.strokeStyle = fg; c.lineWidth = LW; c.lineJoin = "round";
+    for (var i = 0; i < 4; i++) { c.fillText(chs[i], xs[i], mt.H + LW / 2); c.strokeText(chs[i], xs[i], mt.H + LW / 2); }
+    c.restore();
+    var cx = left + (cell * 2 + colon / 2) * sx, r = Math.min(colon * sx * 0.34, ah * 0.07);
+    c.fillStyle = fg; c.beginPath(); c.arc(cx, top + ah * 0.28, r, 0, 7); c.fill(); c.beginPath(); c.arc(cx, top + ah * 0.72, r, 0, 7); c.fill();
+    // 左上の文字（いまの時間＝選んだ色、ほかは灰色、回数は選んだ色）
+    var fs = Math.round(Hc * 0.12), lx = Hc * 0.2, ly = Hc * 0.06;
+    c.font = "bold " + fs + 'px Roboto, "Helvetica Neue", Arial, sans-serif'; c.textAlign = "left"; c.textBaseline = "top";
+    c.lineWidth = fs * 0.22; c.lineJoin = "round"; c.strokeStyle = lc === "#000000" ? (bg === "#000000" ? "#fff" : bg) : "#000";
+    var parts = [["３分", lc], ["→", "#8a8a8a"], ["５分", "#8a8a8a"]], x = lx;
+    for (var p = 0; p < parts.length; p++) { c.strokeText(parts[p][0], x, ly); c.fillStyle = parts[p][1]; c.fillText(parts[p][0], x, ly); x += c.measureText(parts[p][0]).width; }
+    c.strokeText("１／２回", lx, ly + fs * 1.4); c.fillStyle = lc; c.fillText("１／２回", lx, ly + fs * 1.4);
+  }
+  function closeColorDlg() { $("colorDlg").className = ""; }
+  $("cdX").addEventListener("click", closeColorDlg);
+  $("colorDlg").addEventListener("click", function (e) { if (e.target === this) closeColorDlg(); });
+  $("cdAll").addEventListener("click", function () {      // 全部の時間を同じ色に
+    var b = itBg(cdItem), f = itFg(cdItem), l = cdItem.lc;
+    for (var i = 0; i < cdArr.length; i++) {
+      var t = cdArr[i]; delete t.c; t.bg = b; t.fg = f;
+      if (l) t.lc = l; else delete t.lc;
+    }
+    saveCfg(); closeColorDlg(); buildList();
+  });
+  function buildList() {
+    var box = $("fList"); box.innerHTML = "";
+    if (cfg.mode === "list") listEditor(box, cfg.list, null);   // ランダムは回数なし（1周だけ）
+    else listEditor(box, cfg.rlist, "rep");
+  }
+  // 時間の行を、空いている場所でできるだけ大きく表示する
+  //   1列か2列（6番目から右へ）のうち、大きく表示できるほうを選ぶ。どうしても入らないときだけスクロール
+  function fitRows() {
+    var box = $("fList"), sc = box.querySelector(".tScroll"), fr = box.querySelector(".fitRow");
+    if (!sc || !box.offsetParent) return;
+    var rows = [], i, all = sc.querySelectorAll(".tRow");
+    for (i = 0; i < all.length; i++) rows.push(all[i]);
+    var n = rows.length, root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 36;
+    function layout(cols) {
+      sc.innerHTML = "";
+      if (cols === 1) { sc.className = "tScroll"; for (i = 0; i < n; i++) sc.appendChild(rows[i]); return; }
+      sc.className = "tScroll two";
+      var c1 = document.createElement("div"), c2 = document.createElement("div"), half = Math.ceil(n / 2);
+      c1.className = c2.className = "tCol";
+      for (i = 0; i < n; i++) (i < half ? c1 : c2).appendChild(rows[i]);
+      sc.appendChild(c1); sc.appendChild(c2);
+    }
+    function totalH() {                       // fList の中身の高さの合計
+      var t = 0;
+      for (var c = box.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType !== 1) continue;
+        var cs = getComputedStyle(c);
+        t += (c === sc ? sc.scrollHeight : c.offsetHeight) + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+      }
+      return t;
+    }
+    function widthOK(el) { return el.scrollWidth <= el.clientWidth; }   // はみ出しは1pxも許さない（✕が欠けないように）
+    var gSize = 0;                            // 増やす～全部消す の大きさ（0 のときは標準）
+    function fits(k, rk) {
+      sc.style.fontSize = k + "px";
+      if (fr) fr.style.fontSize = rk + "px";
+      var grr = box.querySelector(".grpRow"); if (grr) grr.style.fontSize = k + "px";
+      if (addB) addB.style.fontSize = (gSize || Math.max(k, 0.86 * root)) + "px";
+      if (totalH() > box.clientHeight - 2 || !widthOK(sc)) return false;
+      for (var j = 0; j < n; j++) if (!widthOK(rows[j])) return false;
+      if (fr && !widthOK(fr)) return false;
+      if (addB) {                             // 増やす～全部消すが✕の右端より右にはみ出さない
+        var f0 = sc.querySelector(".tCol:last-child .tRow") || sc.querySelector(".tRow");
+        var d0 = f0 && f0.querySelector(".del");
+        var refR = d0 ? d0.getBoundingClientRect().right : (f0.getBoundingClientRect().right - (parseFloat(getComputedStyle(f0).paddingRight) || 0));
+        if (addB.getBoundingClientRect().right > refR + 1) return false;
+        var u2 = addB.parentNode === fr ? fr.querySelector(".u2") : null;   // 回の＋ボタンとは少し離す
+        if (u2 && addB.getBoundingClientRect().left - u2.getBoundingClientRect().right < 0.35 * rk) return false;
+      }
+      return true;
+    }
+    sc.style.maxHeight = "none";
+    function best(cols) {                     // 時間の行と回の行を同じ大きさで、入るいちばん大きいサイズ
+      layout(cols);
+      var lo = root * 0.35, hi = root * 1.6;
+      if (!fits(lo, lo)) return 0;
+      for (var t = 0; t < 14; t++) { var mid = (lo + hi) / 2; if (fits(mid, mid)) lo = mid; else hi = mid; }
+      return lo;
+    }
+    var addB = box.querySelector(".addGrp");
+    gSize = 0;
+    if (addB) { addB.style.fontSize = ""; addB.style.marginRight = ""; addB.style.width = ""; }   // まずは行と同じ大きさで計算
+    function setShort(on) {                   // 2列のときは「色を選ぶ」を「色」だけにする
+      var ds = sc.querySelectorAll(".cdot");
+      for (var q = 0; q < ds.length; q++) { ds[q].textContent = on ? "色" : "色を選ぶ"; ds[q].className = on ? "cdot short" : "cdot"; }
+    }
+    setShort(false); var one = best(1);
+    setShort(true); var two = n >= 4 ? best(2) : 0;
+    var cols = two > one * 1.05 ? 2 : 1, k = (cols === 2 ? two : one) || root * 0.35;
+    setShort(cols === 2);
+    layout(cols);
+    var rk = k;
+    var isRep = !!fr;
+    if (addB) addB.style.fontSize = Math.max(k, 0.86 * root) + "px";   // 増やす・減らす・全部消す は時間の行くらいの大きさ
+    // 回の行は時間の行と同じ大きさ。ただし2列のときは、もともとの大きさ（1rem）くらいまで大きくする
+    if (cols === 2 && isRep && root > k) {
+      var lo2 = k, hi2 = root;
+      for (var t2 = 0; t2 < 14; t2++) { var m2 = (lo2 + hi2) / 2; if (fits(k, m2)) lo2 = m2; else hi2 = m2; }
+      rk = lo2;
+    }
+    var ownRow = true;                        // 増やす～全部消す は、いつも時間の行のすぐ下の自分の行
+    if (box.querySelector(".grpRow")) box.querySelector(".grpRow").style.fontSize = k + "px";
+    // 増やす～全部消す：スペースがあれば大きくする（時間の行の大きさに合わせて上限あり）
+    if (addB && fits(k, rk)) {
+      var g0 = Math.max(k, 0.86 * root), gHi = ownRow ? Math.max(k * 1.8, root * 1.5) : Math.max(k * 1.25, root * 1.15);
+      var glo = g0, ghi = gHi;
+      for (var t3 = 0; t3 < 12; t3++) { gSize = (glo + ghi) / 2; if (fits(k, rk)) glo = gSize; else ghi = gSize; }
+      gSize = glo;
+    }
+    fits(k, rk);
+    sc.style.fontSize = k + "px";
+    if (fr) fr.style.fontSize = rk + "px";
+    var other = totalH() - sc.scrollHeight;
+    sc.style.maxHeight = Math.max(40, box.clientHeight - other - 2) + "px";
+    sc.style.overflowY = sc.scrollHeight > sc.clientHeight + 1 ? "auto" : "hidden";   // 全部入っていればスクロールしない
+  }
+  window.addEventListener("resize", function () { setTimeout(function () { fitRows(); alignAdd(); }, 50); });
+  function renderMode() {
+    var bs = $("modeBar").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].className = bs[k].getAttribute("data-m") === cfg.mode ? "sel" : "";
+    $("fSame").className = "fArea hide";      // 時間はどちらも一覧で設定
+    $("fList").className = "fArea fList";
+    buildList();
+  }
+  (function () {
+    var bs = $("modeBar").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].addEventListener("click", function () {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      cfg.mode = this.getAttribute("data-m"); saveCfg(); renderMode(); updateTotals();
+    });
+  })();
+  function updateTotals() {
+    var sum = function (arr) { var t = 0; for (var i = 0; i < arr.length; i++) t += (arr[i].m || 0) * 60 + (arr[i].s || 0); return t; };
+    var bs = $("modeBar").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) {
+      var m = bs[k].getAttribute("data-m");
+      var t = m === "list" ? sum(cfg.list || []) : sum(cfg.rlist || []) * (cfg.rep == null ? 1 : cfg.rep);
+      var now = 0;
+      if (running && m === runMode) {          // 動いている（一時停止中の）タイマーのすぎた時間
+        t = 0; for (var q = 0; q < plan.length; q++) t += plan[q];
+        now = elapsedNow();
+      }
+      var isSel = m === (running ? runMode : cfg.mode);
+      bs[k].querySelector(".tot").textContent = isSel ? "経過" + fmtClock(now) + "／残り" + fmtClock(Math.max(0, t - now)) + "／合計" + fmtClock(t) : "";
+    }
+  }
+  function fmtClock(t) {                     // 0:00 の形（1時間以上は 1:05:00）
+    var h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s2 = t % 60;
+    return h ? h + ":" + pad(m) + ":" + pad(s2) : m + ":" + pad(s2);
+  }
+  function elapsedNow() {
+    var before = 0;
+    for (var i = 0; i < round - 1 && i < plan.length; i++) before += plan[i];
+    var cur = plan[round - 1] || 0;
+    var remain = paused ? Math.ceil(remainMs / 1000) : Math.max(0, lastShown);
+    return before + Math.max(0, cur - remain);
+  }
+  window.__updateTotals = updateTotals;
+  if (cfg.mode !== "same" && cfg.mode !== "list") cfg.mode = "same";   // 古い設定（違う時間）はリピートに
+  if (!cfg.rlist || !cfg.rlist.length) cfg.rlist = [{ m: cfg.min, s: cfg.sec }];   // 今までの「分・秒」を引き継ぐ
+  renderMode();
+  updateTotals();
+
+  // 実行する時間の並びを作る（plan ＝ 実際に流す順番を全部並べたもの）
+  var seq = [60], seqRep = 1, plan = [60], planC = ["#ffffff"], planB = [null], planL = ["#40c4ff"], planI = [0];
+  function sec(it) { return (it.m || 0) * 60 + (it.s || 0); }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  var runMode = "same";
+  function buildSeq() {
+    runMode = cfg.mode;
+    if (cfg.mode === "list") { seq = cfg.list.map(sec); seqRep = 1; }
+    else { seq = cfg.rlist.map(sec); seqRep = cfg.rep; }
+    var src = cfg.mode === "list" ? cfg.list : cfg.rlist, items = [];
+    for (var z = 0; z < src.length; z++) if (sec(src[z]) > 0) items.push({ it: src[z], idx: z });
+    seq = items.map(function (o) { return sec(o.it); });
+    plan = []; planC = []; planB = []; planL = []; planI = [];
+    for (var c = 0; c < seqRep; c++) {
+      var order = items.slice();
+      if (cfg.mode === "list") order = shuffle(order);
+      for (var q = 0; q < order.length; q++) { plan.push(sec(order[q].it)); var oi = order[q].it; planC.push(fgHex(oi)); planB.push(itBg(oi) === "black" ? null : bgHex(oi)); planL.push(lcHex(oi)); planI.push(order[q].idx); }
+    }
+  }
+  // 左上の表示
+  //   <1分→5分→3分>リピート
+  //   1/5回
+  function fmtJ(t) {
+    var m = Math.floor(t / 60), s2 = t % 60;
+    return (m ? m + "分" : "") + (s2 ? s2 + "秒" : (m ? "" : "0秒"));
+  }
+  function zen(t) { return String(t).replace(/[0-9]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) + 0xFEE0); }).replace(/\//g, "／"); }
+  function infoLabel() {
+    var len = seq.length || 1;
+    var cyc = Math.min(seqRep, Math.floor((round - 1) / len) + 1);
+    var part = plan.slice((cyc - 1) * len, cyc * len).map(fmtJ).join("→");
+    part = zen(part);
+    if (runMode === "list") return part;
+    return part + "\n" + zen(cyc + "／" + seqRep) + "回";
+  }
+
+  // ---------- 合図音（任意の残り時間に、選んだ音を指定回数） ----------
+  // 1回 ＝ 1秒間。その1秒の中で2回鳴らす（ピーだけは1秒間のばす）
+  function playPattern(type, n) {
+    n = Math.max(1, Math.min(20, n || 1));
+    if (type === "pii") {                       // ピー：n回 ＝ n秒間つながって鳴る
+      beep(0, n * 1.0, 1320);
+      return;
+    }
+    for (var k = 0; k < n; k++) {
+      for (var h = 0; h < 2; h++) {             // 1秒に2回（0秒目と0.5秒目）
+        var t = k * 1.0 + h * 0.5;
+        if (type === "pi") {
+          beep(t, 0.12, 1320);
+        } else if (type === "pipipi") {
+          for (var j = 0; j < 3; j++) beep(t + j * 0.13, 0.08, 1320);
+        } else {
+          pipi(t, 1320);
+        }
+      }
+    }
+  }
+  // 1回 ＝ 10秒：10秒前〜0秒と同じ音（ピッ×5 → ピピッ ピピッ×3 → ピーー2秒）
+  // 10秒の音の説明：1行で、枠に収まるいちばん大きい文字にする
+  function fitTen(el) {
+    if (!el || !el.offsetParent) return;
+    var root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 36;
+    for (var f = root * 0.36; f >= root * 0.22; f -= 0.5) {
+      el.style.fontSize = f + "px";
+      var sp = el.querySelectorAll("span"), ok = el.scrollHeight <= el.clientHeight + 1;
+      for (var i = 0; i < sp.length; i++) if (sp[i].scrollWidth > el.clientWidth - 4) ok = false;
+      if (ok) break;
+    }
+  }
+  window.addEventListener("resize", function () { var ts = document.querySelectorAll("#sndList .tenInfo"); for (var i = 0; i < ts.length; i++) fitTen(ts[i]); });
+  function playTen(n) {
+    n = Math.max(1, Math.min(20, n || 1));
+    for (var k = 0; k < n; k++) {
+      var b = k * 10;
+      for (var i = 0; i < 5; i++) beep(b + i, 0.18, 880);
+      for (i = 5; i < 8; i++) { pipi(b + i, 1320); pipi(b + i + 0.5, 1320); }
+      beep(b + 8, 2.0, 1320);
+    }
+  }
+  function playSnd(c) { if ((c.unit || 1) === 10) playTen(1); else playPattern(c.type, c.n); }   // 10秒は1回だけ
+  var played = {};
+  function customAt(s) {
+    if (!cfg.snd || !cfg.sndOn) return;
+    for (var i = 0; i < cfg.snd.length; i++) {
+      var c = cfg.snd[i], at = (c.m || 0) * 60 + (c.s || 0), key = round + ":" + uid(c);
+      if (at === s && !played[key]) { played[key] = true; playSnd(c); }
+    }
+  }
+  function sndCount() {
+    $("sndBtn").innerHTML = '合図音<span class="chip">' + (cfg.sndOn ? "あり" : "なし") + '</span>';
+    $("sndBtn").className = cfg.sndOn ? "" : "off";
+    var bs = $("sndOnOff").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].className = (bs[k].getAttribute("data-on") === "1") === !!cfg.sndOn ? "sel" : "";
+  }
+  (function () {
+    var bs = $("sndOnOff").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].addEventListener("click", function () {
+      cfg.sndOn = this.getAttribute("data-on") === "1"; saveCfg(); sndCount();
+    });
+  })();
+  function numInput(el, lo, hi, get, set) {
+    el.addEventListener("focus", function () { setTimeout(function () { try { el.select(); } catch (e) {} }, 0); });
+    function commit() {
+      var v = parseInt(el.value, 10);
+      v = isNaN(v) ? get() : Math.max(lo, Math.min(hi, v));
+      set(v);
+    }
+    el.addEventListener("change", commit); el.addEventListener("blur", commit);
+    el.addEventListener("keydown", function (e) { if (e.keyCode === 13) el.blur(); });
+  }
+  function buildSnd() {
+    var list = $("sndList"); list.innerHTML = "";
+    cfg.snd.forEach(function (c, i) {
+      var row = document.createElement("div"); row.className = "annRow";
+      row.innerHTML = '<span class="t">残り</span>' +
+        '<button class="pm md">－</button><input class="num m" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm mu">＋</button>' +
+        '<span class="t">分</span>' +
+        '<button class="pm sd">－</button><input class="num s" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm su">＋</button>' +
+        '<span class="t">秒</span>' +
+        '<div class="unitSeg"><button data-u="1">1秒</button><button data-u="10">10秒</button></div>' +
+        '<span class="grow"></span><button class="annDel">✕</button>' +
+        '<span class="brk"></span>' +
+        '<div class="tenInfo"><span>ピッ×5 → ピピッ・ピピッ×3 → ピーー</span></div>' +
+        '<div class="seg"><button data-t="pi">ピ・ピ</button><button data-t="pipi">ピピッ・ピピッ</button><button data-t="pipipi">ピピピ・ピピピ</button><button data-t="pii">ピー</button></div>' +
+        '<span class="t xn" style="margin-left:0.6vw">×</span>' +
+        '<button class="pm nd xn">－</button><input class="num n xn" type="number" inputmode="numeric" pattern="[0-9]*"><button class="pm nu xn">＋</button>' +
+        '<span class="t xn">回</span>';
+      var im = row.querySelector(".m"), is = row.querySelector(".s"), inn = row.querySelector(".n");
+      function paint() {
+        im.value = pad(c.m || 0); is.value = pad(c.s || 0); inn.value = c.n || 1;
+        var bs = row.querySelectorAll(".seg button");
+        for (var k = 0; k < bs.length; k++) bs[k].className = bs[k].getAttribute("data-t") === c.type ? "sel" : "";
+        var ten = (c.unit || 1) === 10;
+        var us = row.querySelectorAll(".unitSeg button");
+        for (var q = 0; q < us.length; q++) us[q].className = (us[q].getAttribute("data-u") === "10") === ten ? "sel" : "";
+        row.querySelector(".seg").style.display = ten ? "none" : "";
+        var ti = row.querySelector(".tenInfo");
+        ti.style.display = ten ? "flex" : "none";
+        if (ten) setTimeout(function () { fitTen(ti); }, 0);
+        var xs = row.querySelectorAll(".xn");       // 10秒のときは回数を選べないので消す
+        for (var q2 = 0; q2 < xs.length; q2++) xs[q2].style.display = ten ? "none" : "";
+      }
+      var us0 = row.querySelectorAll(".unitSeg button");
+      for (var q0 = 0; q0 < us0.length; q0++) us0[q0].addEventListener("click", function () {
+        c.unit = parseInt(this.getAttribute("data-u"), 10); saveCfg(); paint();
+      });
+      numInput(im, 0, 99, function () { return c.m || 0; }, function (v) { c.m = v; saveCfg(); paint(); });
+      numInput(is, 0, 59, function () { return c.s || 0; }, function (v) { c.s = v; saveCfg(); paint(); });
+      numInput(inn, 1, 20, function () { return c.n || 1; }, function (v) { c.n = v; saveCfg(); paint(); });
+      // 数字の横の －＋（タップで1つ、長押しで連続）
+      holdBtn(row.querySelector(".md"), function () { c.m = Math.max(0, Math.min(99, (c.m || 0) - 1)); saveCfg(); paint(); });
+      holdBtn(row.querySelector(".mu"), function () { c.m = Math.max(0, Math.min(99, (c.m || 0) + 1)); saveCfg(); paint(); });
+      holdBtn(row.querySelector(".sd"), function (k) { c.s = (((c.s || 0) - k) % 60 + 60) % 60; saveCfg(); paint(); });
+      holdBtn(row.querySelector(".su"), function (k) { c.s = (((c.s || 0) + k) % 60 + 60) % 60; saveCfg(); paint(); });
+      holdBtn(row.querySelector(".nd"), function () { c.n = Math.max(1, Math.min(20, (c.n || 1) - 1)); saveCfg(); paint(); });
+      holdBtn(row.querySelector(".nu"), function () { c.n = Math.max(1, Math.min(20, (c.n || 1) + 1)); saveCfg(); paint(); });
+      var bs = row.querySelectorAll(".seg button");
+      for (var k = 0; k < bs.length; k++) bs[k].addEventListener("click", function () {
+        c.type = this.getAttribute("data-t"); saveCfg(); paint();
+        preview(function () { playPattern(c.type, 1); });
+      });
+      row.querySelector(".annDel").addEventListener("click", function () {
+        cfg.snd.splice(i, 1); saveCfg(); buildSnd(); sndCount();
+      });
+      paint();
+      list.appendChild(row);
+    });
+  }
+  $("sndBtn").addEventListener("click", function () {
+    if (!cfg.snd.length) { cfg.snd.push({ m: 0, s: 30, type: "pipi", n: 3, unit: 1 }); saveCfg(); sndCount(); }
+    buildSnd();
+    $("sndPanel").className = "on";
+  });
+  $("sndAdd").addEventListener("click", function () {
+    cfg.snd.push({ m: 0, s: 0, type: "pipi", n: 1, unit: 1 }); saveCfg(); buildSnd(); sndCount();
+  });
+  function setManual(on) { $("sndManual").className = on ? "on" : ""; $("sndManBtn").className = on ? "on" : ""; }
+  $("sndManBtn").addEventListener("click", function () { setManual($("sndManual").className !== "on"); });
+  $("sndManClose").addEventListener("click", function () { setManual(false); });
+  $("sndClose").addEventListener("click", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $("sndPanel").className = "";
+  });
+  sndCount();
+
+  // ---------- アナウンス（女性の声で読み上げ） ----------
+  var synth = window.speechSynthesis || null;
+  var jaVoice = null;
+  function pickVoice() {
+    if (!synth) return null;
+    var vs = synth.getVoices() || [], ja = [], i;
+    for (i = 0; i < vs.length; i++) if (/^ja/i.test(vs[i].lang)) ja.push(vs[i]);
+    if (!ja.length) return null;
+    var female = /Kyoko|O-?ren|Haruka|Ayumi|Nanami|Mizuki|Sayaka|Female|女性|Google\s*日本語/i;
+    var male = /Otoya|Hattori|Ichiro|Keita|Daichi|Naoki|Male|男性/i;
+    for (i = 0; i < ja.length; i++) if (female.test(ja[i].name) && !male.test(ja[i].name)) return ja[i];
+    for (i = 0; i < ja.length; i++) if (!male.test(ja[i].name)) return ja[i];
+    return ja[0];
+  }
+  if (synth) {
+    jaVoice = pickVoice();
+    try { synth.onvoiceschanged = function () { jaVoice = pickVoice(); }; } catch (e) {}
+  }
+  function speak(text, onEnd) {
+    if (!synth || !text) return false;
+    try {
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "ja-JP";
+      if (!jaVoice) jaVoice = pickVoice();
+      if (jaVoice) u.voice = jaVoice;
+      u.volume = Math.max(0, Math.min(1, cfg.vol / 100));
+      u.rate = 1.0;
+      u.pitch = 1.15;            // 少し高めで女性らしく
+      if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
+      synth.speak(u);
+      return true;
+    } catch (e) { return false; }
+  }
+  var speakDone = null;               // 試し読みが終わったとき（または止めたとき）に呼ぶ
+  var speakGen = 0, speakTimers = [];
+  var REPEAT_GAP = 1300;              // くり返すときの、文と文のあいだ（ミリ秒）
+  function speakN(text, n, onDone) {  // 指定回数くり返して読み上げる（あいだを少しあける）
+    n = Math.max(1, Math.min(10, n || 1));
+    if (!synth || !text) return false;
+    var gen = speakGen, i = 0;
+    if (onDone) speakDone = onDone;
+    function one() {
+      if (gen !== speakGen) return;
+      i++;
+      var ok = speak(text, function () {
+        if (gen !== speakGen) return;
+        if (i < n) speakTimers.push(setTimeout(one, REPEAT_GAP));
+        else if (onDone) { if (speakDone === onDone) speakDone = null; onDone(); }
+      });
+      if (!ok && onDone) { if (speakDone === onDone) speakDone = null; onDone(); }
+    }
+    one();
+    return true;
+  }
+  function unlockSpeech() {        // iPhone：最初はボタン操作の中で一度話させておく
+    if (!synth) return;
+    try { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } catch (e) {}
+  }
+  function stopSpeech() {
+    speakGen++;                                  // 続きのくり返しも止める
+    for (var t = 0; t < speakTimers.length; t++) clearTimeout(speakTimers[t]);
+    speakTimers = [];
+    try { if (synth) synth.cancel(); } catch (e) {}
+    if (speakDone) { var f = speakDone; speakDone = null; f(); }   // ボタンの表示を🔊に戻す
+  }
+
+  // 「試合をはじめてください」「移動してください」を読み上げている間、画面いっぱいに「試合」「移動」
+  var bigWordT = null;
+  function showBigWord(word, cls) {
+    var el = $("bigWord"), r = $("run").getBoundingClientRect();
+    el.innerHTML = '<div class="bw"></div><div class="bc"></div>';
+    el.firstChild.textContent = word; el.lastChild.textContent = curText; el.className = "on " + cls;
+    el.style.background = curBg || "#000"; el.style.color = curColor || "#fff";   // いまのカウントの背景と数字の色で
+    el.style.boxShadow = curBg === NAVY ? "inset 0 0 0 " + Math.max(3, Math.round(Math.min(r.width, r.height) * 0.022)) + "px #fff" : "none";   // 紺は白いふち
+    var fsz = Math.floor(Math.min(r.width * 0.92 / Math.max(1, word.length), r.height * 0.8));   // 言葉はできるだけ大きく（字数に合わせる）
+    el.firstChild.style.fontSize = fsz + "px";
+    var cfs = Math.max(14, Math.floor(r.height * 0.15)), bgc = curBg || "#000", ow = Math.max(2, Math.round(cfs * 0.08));
+    el.lastChild.style.fontSize = cfs + "px";                                  // カウントは右下の余白に
+    el.lastChild.style.textShadow = [[ow, 0], [-ow, 0], [0, ow], [0, -ow], [ow, ow], [-ow, -ow], [ow, -ow], [-ow, ow]].map(function (d) { return d[0] + "px " + d[1] + "px 0 " + bgc; }).join(",");
+    if (curBg === NAVY) { el.lastChild.style.right = "4vw"; el.lastChild.style.bottom = "5vh"; } else { el.lastChild.style.right = ""; el.lastChild.style.bottom = ""; }
+  }
+  function hideBigWord() { clearTimeout(bigWordT); clearInterval(bigPoll); $("bigWord").className = ""; $("bigWord").innerHTML = ""; }
+  // 読み上げている間は、ずっと大きな文字を出しておく（終わったら消す）
+  var bigTok = 0, bigPoll = null;
+  function speakWithWord(text, n, word) {      // word：アナウンスで「画面に表示」ありにした言葉
+    word = (word || "").replace(/^\s+|\s+$/g, "");
+    if (!word) { speakN(text, n); return; }
+    var id = ++bigTok;
+    showBigWord(word, "w");
+    clearTimeout(bigWordT); clearInterval(bigPoll);
+    function done() { if (id === bigTok) { clearInterval(bigPoll); hideBigWord(); } }   // あとから別の言葉が出ていたら、そちらは消さない
+    if (!speakN(text, n, done)) { bigWordT = setTimeout(done, 2500); return; }   // 読み上げできない端末でも少しだけ表示
+    // 念のため：読み上げが終わった合図が来ない端末でも、声が止まってしばらくしたら消す
+    var lastBusy = Date.now(), began = Date.now();
+    bigPoll = setInterval(function () {
+      if (id !== bigTok) { clearInterval(bigPoll); return; }
+      var busy = false; try { busy = synth && (synth.speaking || synth.pending); } catch (e) {}
+      if (busy) lastBusy = Date.now();
+      if (Date.now() - lastBusy > REPEAT_GAP + 2500 || Date.now() - began > 60000 * Math.max(1, n || 1)) done();
+    }, 500);
+  }
+  var spoken = {};
+  // アナウンスの「どの時間で」「いつ」は複数選べる（targets: "all" か 番号の配列、whens: 配列）
+  function annNorm(a) {
+    if (a.targets === undefined) a.targets = (a.target === undefined || a.target === null || a.target === "all") ? "all" : [a.target];
+    if (a.whens === undefined) a.whens = [a.when || "remain"];
+    delete a.target; delete a.when;
+    if (a.disp === undefined) { var w0 = phraseWord(a.text); a.disp = !!w0; a.dispText = w0 || ""; }   // 画面表示：前の版は「試合」「移動」だけ自動で表示
+    return a;
+  }
+  function phraseWord(t) {                     // 文例に決まっている、画面に出す言葉
+    t = (t || "").replace(/\s/g, "");
+    if (t === "試合をはじめてください") return "試合";
+    if (t === "移動してください") return "移動";
+    return "";
+  }
+  // ---------- 注意：アナウンスが重なる・時間より長くて読まれない／鳴らない・10秒の音がはみ出す ----------
+  function shortT(t) { t = String(t || "").replace(/\s+/g, ""); return t.length > 12 ? t.slice(0, 12) + "…" : t; }
+  function speechSec(a) {                     // 読み上げにかかるおおよその秒数（くり返しを含む）
+    var n = Math.max(1, Math.min(10, a.n || 1)), len = String(a.text || "").replace(/\s+/g, "").length;
+    return n * (len * 0.16 + 0.5) + (n - 1) * REPEAT_GAP / 1000;
+  }
+  function findWarnings() {
+    var W = [], list = cfg.mode === "list" ? (cfg.list || []) : (cfg.rlist || []), items = [], i, k;
+    for (i = 0; i < list.length; i++) if (sec(list[i]) > 0) items.push(i);
+    var WN = { start: "スタート時", elapsed: "経過", remain: "残り" };
+    function itLab(idx) { return (CIRC.charAt(idx) || (idx + 1)) + "（" + fmtClock(sec(list[idx])) + "）"; }
+    if (cfg.annOn !== false && cfg.ann) {
+      var ev = {};                           // 時間ごとの読み上げ：[はじまる秒, 終わる秒, ラベル]
+      for (i = 0; i < cfg.ann.length; i++) {
+        var a = cfg.ann[i]; if (!a.text) continue; annNorm(a);
+        var at = (a.m || 0) * 60 + (a.s || 0), d = speechSec(a);
+        for (k = 0; k < items.length; k++) {
+          var idx = items[k], T = sec(list[idx]);
+          if (a.targets !== "all" && a.targets.indexOf(idx) < 0) continue;
+          var seen = {};
+          for (var w = 0; w < a.whens.length; w++) {
+            var wh = a.whens[w], e;
+            if (wh === "start") e = 0;
+            else if (at > T) {
+              W.push({ k: "r|" + uid(a) + "|" + wh + "|" + idx, t: itLab(idx) + "のアナウンス「" + shortT(a.text) + "」（" + WN[wh] + fmtClock(at) + "）は、時間より長いので読まれません" });
+              continue;
+            } else e = wh === "elapsed" ? at : T - at;
+            if (seen[e]) continue; seen[e] = 1;
+            (ev[idx] = ev[idx] || []).push([e, e + d, "「" + shortT(a.text) + "」（" + (wh === "start" ? "スタート時" : WN[wh] + fmtClock(at)) + "）", uid(a) + wh]);
+          }
+        }
+      }
+      for (var key in ev) {
+        var L = ev[key].sort(function (x, y) { return x[0] - y[0]; });
+        for (k = 0; k < L.length; k++) for (var j = k + 1; j < L.length; j++) {
+          if (L[j][0] < L[k][1]) W.push({ k: "o|" + key + "|" + L[k][3] + "|" + L[j][3], t: itLab(+key) + "で、" + L[k][2] + "と" + L[j][2] + "の読み上げが重なります" });
+        }
+      }
+    }
+    if (cfg.sndOn && cfg.snd) {
+      for (i = 0; i < cfg.snd.length; i++) {
+        var c = cfg.snd[i], at2 = (c.m || 0) * 60 + (c.s || 0), ten = (c.unit || 1) === 10;
+        for (k = 0; k < items.length; k++) {
+          var T2 = sec(list[items[k]]);
+          if (at2 > T2) W.push({ k: "s|" + uid(c) + "|" + items[k], t: itLab(items[k]) + "では、合図音（残り" + fmtClock(at2) + "）は時間より長いので鳴りません" });
+        }
+        if (ten && at2 < 10) W.push({ k: "t|" + uid(c), t: "合図音の「10秒」の音を残り" + fmtClock(at2) + "に置くと、時間の終わりをこえて次の時間にはみ出します（残り0:10がおすすめ）" });
+      }
+    }
+    return W;
+  }
+  var warnedKeys = null;
+  function checkWarnings() {
+    if ($("setup").className.indexOf("on") < 0) return;
+    var W = findWarnings(), now = {}, F = [], i;
+    for (i = 0; i < W.length; i++) { now[W[i].k] = 1; if (warnedKeys && !warnedKeys[W[i].k]) F.push(W[i]); }
+    warnedKeys = now;                         // 一度知らせたものは、直すまでくり返さない（新しく出たものだけ知らせる）
+    if (!F.length || $("warnDlg").className === "on") return;
+    W = F;
+    var h = "", max = 6;
+    for (i = 0; i < W.length && i < max; i++) h += "<p>・" + esc(W[i].t) + "</p>";
+    if (W.length > max) h += "<p>ほかに " + (W.length - max) + " 件</p>";
+    h += '<p class="sub">このままでも使えますが、時間やタイミングを見直してください。</p>';
+    $("warnMsg").innerHTML = h;
+    $("warnDlg").className = "on";
+    if (cfg.kbd) setTimeout(function () { $("warnOk").focus(); }, 0);
+  }
+  $("warnOk").addEventListener("click", function (e) { e.stopPropagation(); $("warnDlg").className = ""; });
+  $("warnDlg").addEventListener("click", function (e) { if (e.target === this) $("warnDlg").className = ""; });
+  ["click", "change", "keyup"].forEach(function (t) {
+    document.addEventListener(t, function (e) {
+      if (e.target && e.target.id === "warnOk") return;
+      setTimeout(checkWarnings, 80);
+    }, true);
+  });
+  setTimeout(function () { try { warnedKeys = {}; var W0 = findWarnings(); for (var q = 0; q < W0.length; q++) warnedKeys[W0[q].k] = 1; } catch (e) {} }, 0);   // ひらいたときは知らせない（変えたときに知らせる）
+  // アナウンス・合図音の見分け用の番号（保存はしない）。途中で消しても、ほかのものの「読んだ・鳴らした」がずれない
+  var uidSeq = 0;
+  function uid(o) {
+    if (!o._uid) { try { Object.defineProperty(o, "_uid", { value: ++uidSeq, enumerable: false }); } catch (e) { o._uid = ++uidSeq; } }
+    return o._uid;
+  }
+  function announceAt(s) {
+    if (cfg.annOn === false) return;
+    var idx = planI[round - 1], list = runMode === "list" ? cfg.list : cfg.rlist;
+    // 時間の行の「はじめのアナウンス」
+    var cur = list[idx];
+    if (!cfg.ann) return;
+    for (var i = 0; i < cfg.ann.length; i++) {
+      var a = cfg.ann[i];
+      if (!a.text) continue;
+      annNorm(a);
+      if (a.targets !== "all" && a.targets.indexOf(idx) < 0) continue;   // どの時間で読むか
+      var at = (a.m || 0) * 60 + (a.s || 0), hits = [];
+      if (a.whens.indexOf("start") >= 0 && s === total) hits.push("start");
+      if (a.whens.indexOf("elapsed") >= 0 && total - s === at && s !== total) hits.push("elapsed");
+      if (a.whens.indexOf("remain") >= 0 && at === s) hits.push("remain");
+      // 選んだタイミングごとに読む。同じ時刻に重なったときは1回だけ
+      var fresh = false;
+      for (var h = 0; h < hits.length; h++) { var key = round + ":" + uid(a) + ":" + hits[h]; if (!spoken[key]) { spoken[key] = true; fresh = true; } }
+      var tkey = round + ":" + uid(a) + "@" + s;
+      if (fresh && !spoken[tkey]) { spoken[tkey] = true; annNorm(a); speakWithWord(a.text, a.n, a.disp ? (a.dispText || "") : ""); }
+    }
+  }
+
+  // 設定画面
+  function annCount() {
+    var on = cfg.annOn !== false;
+    $("annBtn").innerHTML = 'アナウンス<span class="chip">' + (on ? "あり" : "なし") + '</span>';
+    $("annBtn").className = on ? "" : "off";
+    var bs = $("annOnOff").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].className = (bs[k].getAttribute("data-on") === "1") === on ? "sel" : "";
+  }
+  (function () {
+    var bs = $("annOnOff").querySelectorAll("button");
+    for (var k = 0; k < bs.length; k++) bs[k].addEventListener("click", function () {
+      cfg.annOn = this.getAttribute("data-on") === "1"; saveCfg(); annCount();
+    });
+  })();
+  var PHRASES = ["試合をはじめてください", "移動してください"];   // よく使うアナウンス
+  // アナウンス表示：回数の横に入らないときは、次の段に横並びで出す
+  function annDispLayout() {
+    var rows = document.querySelectorAll("#annList .annRow");
+    for (var i = 0; i < rows.length; i++) {
+      var d = rows[i].querySelector(".disp"), c = rows[i].querySelector(".cnt");
+      if (!d || !c || !c.offsetWidth) continue;
+      d.className = "disp";
+      if (d.offsetTop > c.offsetTop + c.offsetHeight * 0.6) d.className = "disp wrap";
+    }
+  }
+  (function () {
+    function later() { setTimeout(annDispLayout, 0); }
+    if (window.ResizeObserver) { try { new ResizeObserver(later).observe($("annList")); } catch (e) {} }
+    window.addEventListener("resize", later);
+  })();
+  function buildAnn() {
+    var list = $("annList"); list.innerHTML = "";
+    cfg.ann.forEach(function (a, i) {
+      var row = document.createElement("div"); row.className = "annRow";
+      row.innerHTML = '<div class="l1"><div class="segT"></div><div class="segW"></div>' +
+        '<span class="cnt"><button class="pm nd">－</button><input class="num n" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="10"><button class="pm nu">＋</button><span class="t">回</span></span>' +
+        '<span class="disp"><span class="dLab">アナウンス表示</span><span class="dRow"><span class="dOn"><button data-v="1">あり</button><button data-v="0">なし</button></span>' +
+        '<input class="dTxt" type="text" placeholder="表示する言葉" maxlength="8"></span></span>' +
+        '<span class="grow"></span><button class="annDel">✕</button></div>' +
+        '<input class="num m tm" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99">' +
+        '<span class="t tm">分</span>' +
+        '<input class="num s tm" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59">' +
+        '<span class="t tm">秒</span>' +
+        '<input class="txt" type="text" placeholder="読み上げる文章">' +
+        '<select class="phSel" aria-label="文例"><option value="">文例▼</option></select>' +
+        '<button class="annPlay" aria-label="テスト">🔊</button>' +
+        '';
+      var im = row.querySelector(".m"), is = row.querySelector(".s"), it = row.querySelector(".txt"), inn = row.querySelector(".n");
+      // どの時間で（①②…全部）・いつ（スタート時・経過・残り）を、ボタンで選ぶ
+      var tl = cfg.mode === "list" ? cfg.list : cfg.rlist;
+      annNorm(a);
+      if (a.targets !== "all") a.targets = a.targets.filter(function (x) { return x < tl.length; });
+      var segT = row.querySelector(".segT"), segW = row.querySelector(".segW"), th = "";
+      for (var q0 = 0; q0 < tl.length; q0++) th += '<button data-v="' + q0 + '">' + (CIRC.charAt(q0) || (q0 + 1)) + '</button>';
+      segT.innerHTML = th;
+      segW.innerHTML = '<button data-v="start">スタート時</button><button data-v="elapsed">経過</button><button data-v="remain">残り</button>';
+      // タッチで選択、もう一度タッチで解除（いくつでも選べる）
+      function paintSeg() {
+        var bt = segT.querySelectorAll("button"), bw = segW.querySelectorAll("button"), q;
+        for (q = 0; q < bt.length; q++) {
+          var v = bt[q].getAttribute("data-v");
+          var on = a.targets === "all" || (v !== "all" && a.targets.indexOf(parseInt(v, 10)) >= 0);
+          bt[q].className = on ? "sel" : "";
+        }
+        for (q = 0; q < bw.length; q++) bw[q].className = a.whens.indexOf(bw[q].getAttribute("data-v")) >= 0 ? "sel" : "";
+        var needTime = a.whens.indexOf("elapsed") >= 0 || a.whens.indexOf("remain") >= 0;
+        var tms = row.querySelectorAll(".tm");
+        for (q = 0; q < tms.length; q++) tms[q].style.display = needTime ? "" : "none";
+      }
+      Array.prototype.forEach.call(segT.querySelectorAll("button"), function (b) {
+        b.addEventListener("click", function () {
+          var v = b.getAttribute("data-v"), all = [], q;
+          for (q = 0; q < tl.length; q++) all.push(q);
+          if (v === "all") a.targets = a.targets === "all" ? [] : "all";
+          else {
+            var n0 = parseInt(v, 10), cur = a.targets === "all" ? all.slice() : a.targets.slice(), k = cur.indexOf(n0);
+            if (k >= 0) cur.splice(k, 1); else cur.push(n0);
+            cur.sort(function (x, y) { return x - y; });
+            a.targets = cur.length === tl.length ? "all" : cur;
+          }
+          saveCfg(); paintSeg();
+        });
+      });
+      Array.prototype.forEach.call(segW.querySelectorAll("button"), function (b) {
+        b.addEventListener("click", function () {
+          var v = b.getAttribute("data-v"), k = a.whens.indexOf(v);
+          if (k >= 0) a.whens.splice(k, 1); else a.whens.push(v);
+          saveCfg(); paintSeg();
+        });
+      });
+      paintSeg();
+      // よく使う文章：プルダウン（文例）から選ぶ。「自由入力」は文章の欄を空にして、すぐ入力できるように
+      var ps = row.querySelector(".phSel");
+      var o0 = document.createElement("option"); o0.value = "__free"; o0.textContent = "自由入力"; ps.appendChild(o0);
+      PHRASES.forEach(function (t) { var o = document.createElement("option"); o.value = t; o.textContent = t; ps.appendChild(o); });
+      ps.addEventListener("change", function () {
+        var v = ps.value; ps.value = "";                    // いつも「文例」の表示にもどす
+        if (!v) return;
+        if (v === "__free") { it.value = ""; a.text = ""; saveCfg(); annCount(); try { it.focus(); } catch (e) {} return; }
+        it.value = v; a.text = v; autoDisp(); saveCfg(); annCount();
+      });
+      im.value = pad(a.m || 0); is.value = pad(a.s || 0); it.value = a.text || ""; inn.value = a.n || 1;
+      function commit() {
+        var m = parseInt(im.value, 10), sc = parseInt(is.value, 10);
+        a.m = isNaN(m) ? 0 : Math.max(0, Math.min(99, m));
+        a.s = isNaN(sc) ? 0 : Math.max(0, Math.min(59, sc));
+        a.text = it.value;
+        var nn = parseInt(inn.value, 10);
+        a.n = isNaN(nn) ? (a.n || 1) : Math.max(1, Math.min(10, nn));
+        im.value = pad(a.m); is.value = pad(a.s); inn.value = a.n;
+        saveCfg(); annCount();
+      }
+      [im, is, inn].forEach(function (el) {
+        el.addEventListener("focus", function () { setTimeout(function () { try { el.select(); } catch (e) {} }, 0); });
+        el.addEventListener("change", commit); el.addEventListener("blur", commit);
+        el.addEventListener("keydown", function (e) { if (e.keyCode === 13) el.blur(); });
+      });
+      it.addEventListener("input", function () { a.text = it.value; autoDisp(); saveCfg(); annCount(); });
+      // 画面に大きく表示：あり・なしと、表示する言葉
+      var dOn = row.querySelector(".dOn"), dTxt = row.querySelector(".dTxt");
+      function paintDisp() {
+        var bs2 = dOn.querySelectorAll("button");
+        bs2[0].className = a.disp ? "sel" : ""; bs2[1].className = a.disp ? "" : "sel";
+        dTxt.value = a.dispText || ""; dTxt.style.visibility = a.disp ? "" : "hidden";
+      }
+      function autoDisp() {                    // 「試合をはじめてください」「移動してください」なら、表示ありと言葉を自動で入れる
+        var w1 = phraseWord(a.text);
+        if (w1) { a.disp = true; a.dispText = w1; paintDisp(); }
+      }
+      Array.prototype.forEach.call(dOn.querySelectorAll("button"), function (b2) {
+        b2.addEventListener("click", function () { a.disp = b2.getAttribute("data-v") === "1"; saveCfg(); paintDisp(); });
+      });
+      dTxt.addEventListener("input", function () { a.dispText = dTxt.value; saveCfg(); });
+      dTxt.addEventListener("keydown", function (e) { if (e.keyCode === 13) dTxt.blur(); });
+      paintDisp();
+      function addN(d) { a.n = Math.max(1, Math.min(10, (a.n || 1) + d)); inn.value = a.n; saveCfg(); }   // 回数の－＋
+      row.querySelector(".nd").addEventListener("click", function () { addN(-1); });
+      row.querySelector(".nu").addEventListener("click", function () { addN(1); });
+      it.addEventListener("keydown", function (e) { if (e.keyCode === 13) it.blur(); });
+      var pb = row.querySelector(".annPlay");
+      pb.addEventListener("click", function () {
+        if (pb.getAttribute("data-on") === "1") { stopSpeech(); return; }   // 読み上げ中なら途中で止める
+        commit(); stopSpeech();
+        var others = document.querySelectorAll("#annList .annPlay");
+        for (var q = 0; q < others.length; q++) { others[q].setAttribute("data-on", "0"); others[q].textContent = "🔊"; others[q].className = "annPlay"; }
+        if (speakN(a.text || "テストです", a.n, function () { pb.setAttribute("data-on", "0"); pb.textContent = "🔊"; pb.className = "annPlay"; })) {
+          pb.setAttribute("data-on", "1"); pb.textContent = "■ 止める"; pb.className = "annPlay stop";
+        } else $("annMsg").textContent = "この端末では読み上げが使えません（音声データの設定を確認してください）";
+      });
+      row.querySelector(".annDel").addEventListener("click", function () {
+        cfg.ann.splice(i, 1); saveCfg(); buildAnn(); annCount();
+      });
+      list.appendChild(row);
+    });
+    setTimeout(annDispLayout, 0);
+  }
+  $("annBtn").addEventListener("click", function () {
+    if (!cfg.ann.length) cfg.ann.push({ m: 0, s: 30, text: "残り30秒です", n: 1 });
+    buildAnn();
+    $("annMsg").textContent = synth ? "" : "この端末のブラウザは読み上げに対応していません";
+    $("annPanel").className = "on";
+    updateAnnMark();
+  });
+  // ---------- アナウンスの設定の保存・呼び出し ----------
+  if (!cfg.annPresets) cfg.annPresets = [];
+  function annSnap() { for (var i = 0; i < cfg.ann.length; i++) annNorm(cfg.ann[i]); return JSON.parse(JSON.stringify(cfg.ann)); }
+  function annSum(list) {
+    var t = (list || []).map(function (a) { return a.text; }).filter(function (x) { return x; });
+    return t.length ? t.length + "件：" + t.join("／") : "（アナウンスなし）";
+  }
+  function nextApName() {
+    var used = {}, i;
+    for (i = 0; i < cfg.annPresets.length; i++) used[cfg.annPresets[i].name] = true;
+    for (i = 1; i < 1000; i++) if (!used["アナウンス設定" + i]) return "アナウンス設定" + i;
+    return "アナウンス設定";
+  }
+  // 保存したアナウンスの設定を使っているときは、ピンクの時計マークと名前を出す
+  function updateAnnMark() {
+    var now = JSON.stringify(annSnap()), hit = null;
+    for (var i = 0; i < cfg.annPresets.length; i++) if (JSON.stringify(cfg.annPresets[i].data) === now) { hit = cfg.annPresets[i]; break; }
+    $("annMyMark").className = hit ? "on" : ""; $("annMyName").textContent = hit ? hit.name : "";
+    $("annMyName").className = "";              // 名前は表示しない（マークだけ）
+  }
+  window.__updateAnnMark = updateAnnMark;
+  $("apSaveBtn").addEventListener("click", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    var now = JSON.stringify(annSnap());
+    for (var i = 0; i < cfg.annPresets.length; i++) {
+      if (JSON.stringify(cfg.annPresets[i].data) === now) {        // 同じものがある
+        $("dupMsg").innerHTML = '<span class="x">✕</span>同じアナウンスの設定がすでに保存されています<small>「' + esc(cfg.annPresets[i].name) + '」</small>';
+        $("dupMsg").style.display = "block";
+        return;
+      }
+    }
+    $("apSaveSum").textContent = annSum(cfg.ann);
+    $("apName").value = nextApName(); $("apErr").textContent = "";
+    $("apSaveDlg").className = "on";
+  });
+  function closeApSave() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); $("apSaveDlg").className = ""; }
+  $("apSaveX").addEventListener("click", closeApSave);
+  $("apSaveOk").addEventListener("click", function () {
+    if (cfg.annPresets.length >= 20) { closeApSave(); toast("保存できるのは20件までです"); return; }
+    var name = ($("apName").value || "").trim() || nextApName();
+    for (var q = 0; q < cfg.annPresets.length; q++) if (cfg.annPresets[q].name === name) {
+      $("apErr").textContent = "「" + name + "」はすでにあります。別の名前にしてください"; return;
+    }
+    cfg.annPresets.unshift({ id: "a" + Date.now(), name: name, data: annSnap() });
+    saveCfg(); closeApSave(); toast("「" + name + "」を保存しました");
+  });
+  $("apName").addEventListener("keydown", function (e) { if (e.keyCode === 13) $("apSaveOk").click(); });
+  $("apName").addEventListener("input", function () { $("apErr").textContent = ""; });
+  $("sdName").addEventListener("input", function () { $("sdErr").textContent = ""; });
+  (function () {                          // 名前の欄をタップすると全部選ばれる
+    var el = $("apName"), fresh = false;
+    function selAll() { try { el.setSelectionRange(0, el.value.length); } catch (e) { try { el.select(); } catch (e2) {} } }
+    el.addEventListener("focus", function () { fresh = true; selAll(); setTimeout(selAll, 50); });
+    el.addEventListener("mouseup", function (e) { if (fresh) { e.preventDefault(); selAll(); fresh = false; } });
+    el.addEventListener("touchend", function () { if (fresh) { setTimeout(selAll, 0); fresh = false; } });
+  })();
+  function buildApList() {
+    var list = $("apList"); list.innerHTML = "";
+    if (!cfg.annPresets.length) { list.innerHTML = '<div id="presetEmpty">まだ保存したアナウンスの設定はありません。アナウンス画面の「この設定を保存」で保存できます。</div>'; return; }
+    cfg.annPresets.forEach(function (p, i) {
+      var row = document.createElement("div"); row.className = "pRow";
+      row.innerHTML = '<div class="txt"><div class="nmRow"><div class="nm">' + esc(p.name) + '</div>' +
+        '<button class="pRen" aria-label="名前を変える"><svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M4 20 L5 15.5 L15.5 5 Q16.5 4 17.5 5 L19 6.5 Q20 7.5 19 8.5 L8.5 19 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M13.5 7 L17 10.5" stroke="currentColor" stroke-width="2"/></svg></button></div>' +
+        '<div class="sm">' + esc(annSum(p.data)) + '</div></div>' +
+        '<button class="pLoad">呼び出す</button><button class="pDel">✕</button>';
+      row.querySelector(".pLoad").addEventListener("click", function () {
+        cfg.ann = JSON.parse(JSON.stringify(p.data));
+        cfg.annPresets.splice(i, 1); cfg.annPresets.unshift(p);     // 使ったものをいちばん上に
+        saveCfg(); buildAnn(); annCount();
+        $("apPanel").className = "";
+      });
+      row.querySelector(".pDel").addEventListener("click", function () { cfg.annPresets.splice(i, 1); saveCfg(); buildApList(); });
+      row.querySelector(".pRen").addEventListener("click", function () {
+        var nm = row.querySelector(".nm");
+        if (nm.querySelector("input")) { nm.querySelector("input").blur(); return; }
+        nm.style.webkitFlex = "1"; nm.style.flex = "1"; row.querySelector(".pRen").style.display = "none";
+        var inp = document.createElement("input"); inp.type = "text"; inp.className = "pRenIn"; inp.value = p.name;
+        nm.innerHTML = ""; nm.appendChild(inp); inp.focus(); try { inp.select(); } catch (e) {}
+        var done = false;
+        function commit() {
+          if (done) return; done = true; var v = (inp.value || "").trim();
+          var dup = false; for (var q = 0; q < cfg.annPresets.length; q++) if (cfg.annPresets[q] !== p && cfg.annPresets[q].name === v) dup = true;
+          if (v && dup) toast("「" + v + "」はすでにあるので変更できません");
+          else if (v) { p.name = v; saveCfg(); }
+          buildApList();
+        }
+        inp.addEventListener("blur", commit);
+        inp.addEventListener("keydown", function (e) { if (e.keyCode === 13) inp.blur(); });
+      });
+      list.appendChild(row);
+    });
+  }
+  $("apListBtn").addEventListener("click", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    buildApList(); $("apPanel").className = "on";
+  });
+  $("apClose").addEventListener("click", function () { $("apPanel").className = ""; });
+  // 全部消す（作り直すとき用）。間違えたときは「元に戻す」
+  $("annClear").addEventListener("click", function () {
+    if (!cfg.ann.length) return;
+    stopSpeech();
+    var backup = JSON.parse(JSON.stringify(cfg.ann));
+    cfg.ann = []; saveCfg(); buildAnn(); annCount(); updateAnnMark();
+    showUndo(function () { cfg.ann = backup; saveCfg(); buildAnn(); annCount(); updateAnnMark(); });
+  });
+  $("annAdd").addEventListener("click", function () {
+    cfg.ann.push({ m: 0, s: 0, text: "", n: 1, whens: ["remain"], targets: "all" }); saveCfg(); buildAnn();
+  });
+  $("annClose").addEventListener("click", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    stopSpeech();
+    $("annPanel").className = "";
+  });
+  annCount();
+  setTimeout(updateMyMark, 0);               // 起動の準備が全部終わってから印を判定
+  $("myMark").addEventListener("click", function () { var p = activePreset(); if (p) toast("保存した設定を使用中：" + p.name); });
+  $("saveHere").addEventListener("click", function () {
+    var now = JSON.stringify(snapshot());
+    for (var i = 0; i < cfg.presets.length; i++) {
+      if (JSON.stringify(cfg.presets[i].data) === now) {      // すでに同じ設定がある
+        $("dupMsg").innerHTML = '<span class="x">✕</span>同じ設定がすでに保存されています<small>「' + esc(cfg.presets[i].name) + '」</small>';
+        $("dupMsg").style.display = "block";
+        return;
+      }
+    }
+    openSaveDlg();
+  });
+  $("dupMsg").addEventListener("click", function () { this.style.display = "none"; });
+
+  // ---------- 保存した設定（よく使う設定を保存して呼び出す） ----------
+  var PRESET_KEYS = ["mode", "rlist", "rep", "list", "snd", "sndOn", "ann", "annOn"];
+  if (!cfg.presets) cfg.presets = [];
+  // マイタイマー使用中か（呼び出した／保存した設定から変えていなければ使用中）
+  function activePreset() {
+    if (!cfg.activePreset) return null;
+    for (var i = 0; i < cfg.presets.length; i++) {
+      var p = cfg.presets[i];
+      if (p.id === cfg.activePreset) return JSON.stringify(p.data) === JSON.stringify(snapshot()) ? p : null;
+    }
+    return null;
+  }
+  function updateMyMark() {
+    var p = activePreset();
+    $("myMark").className = p ? "on" : "";
+    $("myMark").title = p ? "保存した設定を使用中：" + p.name : "";
+  }
+  window.__updateMy = updateMyMark;
+  function snapshot() {
+    var o = {};
+    for (var i = 0; i < PRESET_KEYS.length; i++) o[PRESET_KEYS[i]] = JSON.parse(JSON.stringify(cfg[PRESET_KEYS[i]]));
+    return o;
+  }
+  function tShort(it) { return ((it.m || 0) * 60 + (it.s || 0) >= 60 ? (it.m || 0) + ":" + pad(it.s || 0) : "0:" + pad(it.s || 0)); }
+  function presetSummary(o) {
+    var arr = o.mode === "list" ? o.list : o.rlist;
+    var times = (arr || []).map(tShort).join("→");
+    var h = (o.mode === "list" ? "ランダム " : "リピート ") + times + (o.mode === "list" ? "" : " ×" + o.rep + "回");
+    h += "　合図音" + (o.sndOn === false ? "なし" : "あり") + "　アナウンス" + (o.annOn === false ? "なし" : "あり");
+    return h;
+  }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function buildPresets() {
+    var list = $("presetList"); list.innerHTML = "";
+    if (!cfg.presets.length) { list.innerHTML = '<div id="presetEmpty">まだ保存した設定はありません。設定画面の「この設定を保存」で保存できます。</div>'; return; }
+    cfg.presets.forEach(function (p, i) {
+      var row = document.createElement("div"); row.className = "pRow";
+      row.innerHTML = '<div class="txt"><div class="nmRow"><div class="nm">' + esc(p.name) + '</div>' +
+        '<button class="pRen" aria-label="名前を変える"><svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M4 20 L5 15.5 L15.5 5 Q16.5 4 17.5 5 L19 6.5 Q20 7.5 19 8.5 L8.5 19 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M13.5 7 L17 10.5" stroke="currentColor" stroke-width="2"/></svg></button></div>' +
+        '<div class="sm">' + esc(presetSummary(p.data)) + '</div></div>' +
+        '<button class="pLoad">呼び出す</button><button class="pDel">✕</button>';
+      row.querySelector(".pLoad").addEventListener("click", function () {
+        var d = JSON.parse(JSON.stringify(p.data));
+        cfg.presets.splice(i, 1); cfg.presets.unshift(p);   // 使ったものをいちばん上に
+        if (!p.id) p.id = "p" + Date.now();
+        cfg.activePreset = p.id;
+        for (var k in d) cfg[k] = d[k];
+        if (!cfg.rlist || !cfg.rlist.length) cfg.rlist = [{ m: 1, s: 0 }];
+        if (!cfg.list || !cfg.list.length) cfg.list = [{ m: 1, s: 0 }];
+        saveCfg(); renderMode(); updateTotals(); sndCount(); annCount();
+        $("presetPanel").className = "";
+      });
+      row.querySelector(".pDel").addEventListener("click", function () {
+        cfg.presets.splice(i, 1); saveCfg(); buildPresets();
+      });
+      // 名前の変更：名前の欄が入力欄に変わる（Enter か 欄の外を押すと決定）
+      row.querySelector(".pRen").addEventListener("click", function () {
+        var nm = row.querySelector(".nm");
+        nm.style.webkitFlex = "1"; nm.style.flex = "1"; row.querySelector(".pRen").style.display = "none";
+        if (nm.querySelector("input")) { nm.querySelector("input").blur(); return; }
+        var inp = document.createElement("input");
+        inp.type = "text"; inp.className = "pRenIn"; inp.value = p.name;
+        nm.innerHTML = ""; nm.appendChild(inp);
+        inp.focus(); try { inp.select(); } catch (e) {}
+        var done = false;
+        function commit() {
+          if (done) return; done = true;
+          var v = (inp.value || "").trim();
+          var dup = false; for (var q = 0; q < cfg.presets.length; q++) if (cfg.presets[q] !== p && cfg.presets[q].name === v) dup = true;
+          if (v && dup) toast("「" + v + "」はすでにあるので変更できません");
+          else if (v) { p.name = v; saveCfg(); }
+          buildPresets();
+        }
+        inp.addEventListener("blur", commit);
+        inp.addEventListener("keydown", function (e) { if (e.keyCode === 13) inp.blur(); });
+      });
+      list.appendChild(row);
+    });
+  }
+  $("presetBtn").addEventListener("click", function () {
+    $("presetMsg").textContent = "";
+    buildPresets();
+    $("presetPanel").className = "on";
+  });
+  // 設定画面の「この設定を保存」
+  var toastT = null;
+  function toast(msg) {
+    $("toast").textContent = msg; $("toast").style.display = "block";
+    clearTimeout(toastT); toastT = setTimeout(function () { $("toast").style.display = "none"; }, msg.length > 20 ? 3500 : 1800);
+  }
+  // ---- 保存した設定の書き出し・読み込み（ファイル） ----
+  function downloadText(name, text) {        // ふつうのダウンロード（ダウンロードフォルダへ）
+    try {
+      var blob = new Blob([text], { type: "application/json" });
+      var url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = name; a.style.display = "none";
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+      toast("書き出しました（ダウンロード）");
+    } catch (e) { toast("書き出せませんでした"); }
+  }
+  // claude.ai のアーティファクトで開いたとき：ファイルの書き出しは、claude.ai の保存のしくみを使う
+  var dlNs = null;
+  try { if (window.claude && window.claude.use) window.claude.use("downloads").then(function (d) { dlNs = d; }, function () {}); } catch (e) {}
+  $("pExport").addEventListener("click", function () {
+    if (!cfg.presets.length && !cfg.annPresets.length) { toast("保存した設定がありません"); return; }
+    var data = { app: "魁タイマー", kind: "保存した設定", ver: 1, date: new Date().toISOString(),
+                 presets: cfg.presets, annPresets: cfg.annPresets };
+    // ファイル名：使っている設定（なければ一覧のいちばん上）の名前。アナウンスの設定の名前は使わない
+    var act = null, ii;
+    for (ii = 0; ii < cfg.presets.length; ii++) if (cfg.presets[ii].id && cfg.presets[ii].id === cfg.activePreset) { act = cfg.presets[ii]; break; }
+    if (!act && cfg.presets.length) act = cfg.presets[0];
+    var base = act ? act.name.replace(/[\\\/:*?"<>|]/g, "_").replace(/^\s+|\s+$/g, "") : "";
+    var text = JSON.stringify(data, null, 1), name = (base || "魁タイマー_保存した設定") + ".json";
+    if (dlNs) {
+      dlNs.save({ filename: name, data: text }).then(function () { toast("書き出しました"); }, function (e) {
+        if (e && e.code === "declined") return;                       // やめたときは何もしない
+        toast(e && e.code === "rate_limited" ? "少し待ってから、もう一度押してください" : "書き出せませんでした");
+      });
+      return;
+    }
+    if (window.showSaveFilePicker) {          // パソコンのChrome・Edge：保存先のフォルダを選べる（前のフォルダを覚えている）
+      var opts = { suggestedName: name, id: "sakigakeTimer", types: [{ description: "魁タイマーの設定", accept: { "application/json": [".json"] } }] };
+      var p;
+      try { p = window.showSaveFilePicker(opts); } catch (e0) { downloadText(name, text); return; }
+      p.then(function (h) { return h.createWritable(); })
+       .then(function (w) { return w.write(text).then(function () { return w.close(); }); })
+       .then(function () { toast("書き出しました"); })
+       .catch(function (e) { if (e && e.name === "AbortError") return; downloadText(name, text); });   // やめたときは何もしない
+    } else downloadText(name, text);
+  });
+  // マークのボタンの説明（大きめの文字で、ボタンの下に出す）
+  function showTip(el) {
+    var t = $("tip"), r = el.getBoundingClientRect();
+    t.textContent = el.getAttribute("data-tip"); t.style.display = "block";
+    var w = t.offsetWidth, x = Math.min(window.innerWidth - w - 4, Math.max(4, (r.left + r.right) / 2 - w / 2));
+    t.style.left = x + "px"; t.style.top = (r.bottom + 6) + "px";
+  }
+  function hideTip() { $("tip").style.display = "none"; }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tip]"), function (el) {
+    el.addEventListener("mouseenter", function () { showTip(el); });
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("focus", function () { if (cfg.kbd) showTip(el); });
+    el.addEventListener("blur", hideTip);
+    el.addEventListener("click", hideTip);
+  });
+  $("pImport").addEventListener("click", function () { $("pFile").value = ""; $("pFile").click(); });
+  function mergeList(dst, src, isPreset) {   // 同じ中身はとばす。同じ名前は名前を変えて追加
+    var added = 0, skipped = 0;
+    for (var i = 0; i < src.length; i++) {
+      var p = src[i];
+      if (!p || typeof p.name !== "string" || !p.data || typeof p.data !== "object") continue;
+      var ds = JSON.stringify(p.data), same = false, j;
+      for (j = 0; j < dst.length; j++) if (JSON.stringify(dst[j].data) === ds) { same = true; break; }
+      if (same) { skipped++; continue; }
+      var nm = p.name, used = {}, k = 2;
+      for (j = 0; j < dst.length; j++) used[dst[j].name] = true;
+      while (used[nm]) nm = p.name + "（" + (k++) + "）";
+      var item = { name: nm, data: JSON.parse(ds) };
+      if (isPreset) item.id = "p" + Date.now() + "_" + i;
+      dst.push(item); added++;
+    }
+    return [added, skipped];
+  }
+  $("pFile").addEventListener("change", function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      var d;
+      try { d = JSON.parse(rd.result); } catch (e) { d = null; }
+      if (!d || (!d.presets && !d.annPresets)) { toast("魁タイマーの設定ファイルではありません"); return; }
+      var a = mergeList(cfg.presets, d.presets || [], true), b = mergeList(cfg.annPresets, d.annPresets || [], false);
+      saveCfg(); buildPresets();
+      var msg = "読み込みました（設定 " + a[0] + "件・アナウンス " + b[0] + "件）";
+      if (a[1] + b[1]) msg += "\n同じものは とばしました（" + (a[1] + b[1]) + "件）";
+      toast(msg);
+    };
+    rd.onerror = function () { toast("読み込めませんでした"); };
+    rd.readAsText(f);
+  });
+  function nextPresetName() {
+    var used = {}, i;
+    for (i = 0; i < cfg.presets.length; i++) used[cfg.presets[i].name] = true;
+    for (i = 1; i < 1000; i++) if (!used["設定" + i]) return "設定" + i;
+    return "設定";
+  }
+  function openSaveDlg() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $("sdSum").textContent = presetSummary(snapshot());
+    $("sdName").value = nextPresetName(); $("sdErr").textContent = "";     // 原則「設定1」「設定2」…。変えたいときだけ書き換える
+    $("saveDlg").className = "on";
+  }
+  function closeSaveDlg() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $("saveDlg").className = "";
+  }
+  $("sdCancel").addEventListener("click", closeSaveDlg);
+  $("sdOk").addEventListener("click", function () {
+    if (cfg.presets.length >= 20) { closeSaveDlg(); toast("保存できるのは20件までです"); return; }
+    var name = ($("sdName").value || "").trim() || nextPresetName();
+    for (var q = 0; q < cfg.presets.length; q++) if (cfg.presets[q].name === name) {   // 同じ名前は保存しない
+      $("sdErr").textContent = "「" + name + "」はすでにあります。別の名前にしてください"; return;
+    }
+    var nid = "p" + Date.now();
+    cfg.presets.unshift({ id: nid, name: name, data: snapshot() });
+    cfg.activePreset = nid;
+    saveCfg(); closeSaveDlg();
+    toast("「" + name + "」を保存しました");
+  });
+  // 名前の欄をタップすると全部選ばれて、そのまま入力すると書き換わる
+  (function () {
+    var el = $("sdName"), fresh = false;
+    function selAll() { try { el.setSelectionRange(0, el.value.length); } catch (e) { try { el.select(); } catch (e2) {} } }
+    el.addEventListener("focus", function () { fresh = true; selAll(); setTimeout(selAll, 50); });
+    el.addEventListener("mouseup", function (e) { if (fresh) { e.preventDefault(); selAll(); fresh = false; } });
+    el.addEventListener("touchend", function () { if (fresh) { setTimeout(selAll, 0); fresh = false; } });
+    el.addEventListener("blur", function () { fresh = false; });
+  })();
+  $("sdName").addEventListener("keydown", function (e) { if (e.keyCode === 13) $("sdOk").click(); });
+  $("presetClose").addEventListener("click", function () {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $("presetPanel").className = "";
+  });
+
+  // ---------- 画面スリープ防止 ----------
+  var wakeLock = null;
+  function keepAwake() {
+    try {
+      if (navigator.wakeLock && navigator.wakeLock.request)
+        navigator.wakeLock.request("screen").then(function (w) { wakeLock = w; })["catch"](function () {});
+    } catch (e) {}
+  }
+  function releaseAwake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && running) keepAwake();
+  });
+
+  // ---------- 数字を画面いっぱいに（canvasで描画） ----------
+  // 「00:00」の4桁を、横幅いっぱい＋縦も画面いっぱいに伸ばして描く
+  var FONT = 'bold 100px Roboto, "Helvetica Neue", Arial, sans-serif';
+  var cv = $("cv"), c2 = cv.getContext("2d");
+  var curText = "", curColor = "#fff", curBg = null;
+  var COLOR = { normal: "#ffffff", warn: "#ffea00", alert: "#ff3b30" };
+  var metric = null;
+
+  function getMetric() {
+    if (metric) return metric;
+    c2.font = FONT;
+    var W = 0, H = 0;
+    for (var d = 0; d <= 9; d++) {
+      var m = c2.measureText(String(d));
+      if (m.width > W) W = m.width;
+      if (typeof m.actualBoundingBoxAscent === "number" && m.actualBoundingBoxAscent > H) H = m.actualBoundingBoxAscent;
+    }
+    if (!H) H = 72;                         // 測れない古い端末の目安
+    metric = { W: W, H: H };
+    return metric;
+  }
+
+  function draw() {
+    var dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c2.clearRect(0, 0, w, h);
+    if (curBg) { c2.fillStyle = curBg; c2.fillRect(0, 0, w, h); }   // 蛍光色・紺の背景
+    if (curBg === NAVY) {                      // 紺（卓球台の色）：まわりを白いふちで囲む
+      var ew = Math.max(3, Math.round(Math.min(w, h) * 0.022));
+      c2.fillStyle = "#fff";
+      c2.fillRect(0, 0, w, ew); c2.fillRect(0, h - ew, w, ew); c2.fillRect(0, 0, ew, h); c2.fillRect(w - ew, 0, ew, h);
+    }
+    if (!curText) return;
+    c2.fillStyle = curColor;
+
+    // 描画エリア：画面全体
+    var top = h * 0.01, bottom = h * 0.99, left = w * 0.005, right = w * 0.995;   // ほぼ画面全体
+    if (curBg === NAVY) { var inn = Math.max(3, Math.round(Math.min(w, h) * 0.022)) * 2.2; top += inn; bottom -= inn; left += inn; right -= inn; }   // 紺：白いふちの内側に数字
+    var aw = right - left, ah = bottom - top;
+
+    if (!/^\d\d:\d\d$/.test(curText)) {     // 「終了」など
+      c2.font = FONT;
+      var tw = c2.measureText(curText).width;
+      var sc = Math.min(aw / tw, ah / 100);
+      c2.save();
+      c2.translate(w / 2, top + ah / 2); c2.scale(sc, sc);
+      c2.textAlign = "center"; c2.textBaseline = "middle";
+      c2.fillText(curText, 0, 0);
+      c2.restore();
+      return;
+    }
+
+    var mt = getMetric();
+    var LW = 3;                             // 線を太くする量（縦に伸ばしても縦線が細くならないように）
+    var cell = mt.W * 1.0 + LW;             // 数字1つ分のマス（全部同じ幅）
+    var colon = mt.W * 0.34;                // コロンは細く
+    var sx = aw / (cell * 4 + colon);       // 横の倍率：幅いっぱい
+    var sy = ah / (mt.H + LW);              // 縦の倍率：高さいっぱい
+    var ch = [curText.charAt(0), curText.charAt(1), curText.charAt(3), curText.charAt(4)];
+    var xs = [cell * 0.5, cell * 1.5, cell * 2.5 + colon, cell * 3.5 + colon];
+
+    c2.save();
+    c2.translate(left, top); c2.scale(sx, sy);
+    c2.font = FONT; c2.textAlign = "center"; c2.textBaseline = "alphabetic";
+    c2.strokeStyle = curColor; c2.lineWidth = LW; c2.lineJoin = "round";
+    for (var i = 0; i < 4; i++) {
+      c2.fillText(ch[i], xs[i], mt.H + LW / 2);
+      c2.strokeText(ch[i], xs[i], mt.H + LW / 2);
+    }
+    c2.restore();
+
+    // コロンは丸2つを描く（伸ばしても楕円にならない）
+    var cx = left + (cell * 2 + colon / 2) * sx;
+    var r = Math.min(colon * sx * 0.34, ah * 0.07);
+    c2.beginPath(); c2.arc(cx, top + ah * 0.28, r, 0, Math.PI * 2); c2.fill();
+    c2.beginPath(); c2.arc(cx, top + ah * 0.72, r, 0, Math.PI * 2); c2.fill();
+
+    timesRect = null;
+    // 左上：表示中の四角（歯車の内容→砂時計の内容）を上から順に。消しているもののボタンは、その下に並べる
+    var rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 36, stackY = rootPx * 0.12, stackGap = h * 0.02;
+    // 何回目か「1/2」：左端の数字の左上に少し重ねて、濃い蛍光グリーンで
+    if (!showInfo) infoRect = null;
+    if (showInfo) {
+      var label = infoLabel();
+      var fs = Math.round(h * 0.075);
+      c2.font = 'bold ' + fs + 'px Roboto, "Helvetica Neue", Arial, sans-serif';
+      c2.textAlign = "left"; c2.textBaseline = "top";
+      c2.lineJoin = "round";
+      c2.lineWidth = fs * 0.22;
+      c2.strokeStyle = "#000";                       // 黒いふちで数字の上でも読める
+      var ib = $("infoBtn").getBoundingClientRect();
+      var bpad = fs * 0.3;                                  // 四角の内側の余白
+      var lx = ib.left + bpad, ly = stackY + bpad * 0.8 - fs * 0.12;   // 歯車ボタンの場所から、四角で囲んで表示（表示中はボタンを消す）
+      // 数字の色の反対（補色）っぽい色で目立たせる：BASE＝文字（いまの時間・回も同じ色で、枠で囲む）、DIM＝終わった時間
+      var BASE = planL[round - 1] || "#40c4ff", DIM = "#8a8a8a";   // 左上の文字は選んだ色
+      var EDGE = BASE === "#000000" ? (curBg || "#ffffff") : "#000";   // 黒い文字のときだけ、ふちは背景色（黒地なら白）
+      c2.fillStyle = BASE;
+      var lines = label.split("\n");
+      var maxW = 0, li0;
+      for (li0 = 0; li0 < lines.length; li0++) maxW = Math.max(maxW, c2.measureText(lines[li0]).width);
+      var vb = $("runVolBtn").getBoundingClientRect(), room = ((vb.width && vb.left > lx) ? vb.left - w * 0.01 : w * 0.98) - lx;   // 右上の音量ボタンにかからないように
+      maxW += bpad * 2 + w * 0.012;                  // 四角のぶん
+      if (maxW > room) {                             // 長い並びは画面幅に収まるよう小さく
+        fs = Math.floor(fs * room / maxW);
+        c2.font = 'bold ' + fs + 'px Roboto, "Helvetica Neue", Arial, sans-serif';
+        c2.lineWidth = fs * 0.22;
+      }
+      var li;
+      var mw = 0;
+      // 「いま」の時間と回は、同じ色のまま「丸」で囲んで表す（蛍光黄。背景か数字が黄・緑のときは蛍光赤）
+      var items = [], pad = fs * 0.2, LH = fs * 1.4;
+      for (li = 0; li < lines.length; li++) {
+        var yy = ly + fs * 0.12 + li * LH, x = lx;
+        if (li === 0 && seq.length > 1) {
+          var parts = lines[li].split("→");
+          var cur = running ? (round - 1) % seq.length : -1;
+          for (var pi2 = 0; pi2 < parts.length; pi2++) {
+            var wv = c2.measureText(parts[pi2]).width;
+            items.push([parts[pi2], x, yy, (cur < 0 || pi2 === cur) ? BASE : DIM]);   // いまの時間だけ選んだ色、ほかは灰色（丸はつけない）
+            x += wv;
+            if (pi2 < parts.length - 1) { items.push(["→", x, yy, DIM]); x += c2.measureText("→").width; }
+          }
+        } else if (li === 1 && runMode !== "list" && lines[li].indexOf("／") > 0) {
+          var sl = lines[li].indexOf("／"), curT = lines[li].slice(0, sl), restT = lines[li].slice(sl), wc = c2.measureText(curT).width;
+          items.push([curT, x, yy, BASE]); x += wc;                                  // 回数は灰色にしない
+          items.push([restT, x, yy, BASE]); x += c2.measureText(restT).width;
+        } else {
+          items.push([lines[li], x, yy, BASE]); x += c2.measureText(lines[li]).width;
+        }
+        mw = Math.max(mw, x - lx);
+      }
+      infoRect = { l: lx - bpad, t: stackY, r: lx + mw + bpad, b: ly + fs * 0.12 + (lines.length - 1) * LH + fs * 1.1 + bpad * 0.8 };
+      boxFrame(infoRect, BASE, EDGE, fs);            // 文字と同じ色の四角で囲む
+      stackY = infoRect.b + stackGap;
+      var it2;
+      c2.strokeStyle = EDGE;
+      for (it2 = 0; it2 < items.length; it2++) c2.strokeText(items[it2][0], items[it2][1], items[it2][2]);   // 黒いふちを先に全部
+      for (it2 = 0; it2 < items.length; it2++) { c2.fillStyle = items[it2][3]; c2.fillText(items[it2][0], items[it2][1], items[it2][2]); }
+    }
+    // 砂時計：経過・残り・合計の時間（砂時計の右。左上の文字があるときは、その四角の下）
+    if (showTimes) {
+      var tfs = Math.round(h * 0.075), tpad = tfs * 0.3;
+      c2.font = 'bold ' + tfs + 'px Roboto, "Helvetica Neue", Arial, sans-serif';
+      c2.textAlign = "left"; c2.textBaseline = "top"; c2.lineJoin = "round"; c2.lineWidth = tfs * 0.22;
+      var TB = planL[round - 1] || "#40c4ff", TE = TB === "#000000" ? (curBg || "#ffffff") : "#000";
+      var hb = $("timeBtn").getBoundingClientRect();
+      var tLH = tfs * 1.4, tx = hb.left + tpad;   // 砂時計ボタンの場所から（表示中はボタンを消す）
+      var bt = stackY;
+      var ty = bt + tpad * 0.8;
+      var tls = timesLines(), tw = 0, tq;
+      for (tq = 0; tq < tls.length; tq++) tw = Math.max(tw, c2.measureText(tls[tq]).width);
+      timesRect = { l: tx - tpad, t: bt, r: tx + tw + tpad, b: ty + (tls.length - 1) * tLH + tfs * 1.1 + tpad * 0.8 };
+      boxFrame(timesRect, TB, TE, tfs);
+      c2.lineWidth = tfs * 0.22; c2.strokeStyle = TE;
+      for (tq = 0; tq < tls.length; tq++) c2.strokeText(tls[tq], tx, ty + tq * tLH);
+      c2.fillStyle = TB;
+      for (tq = 0; tq < tls.length; tq++) c2.fillText(tls[tq], tx, ty + tq * tLH);
+      stackY = timesRect.b + stackGap;
+    }
+    if (!showInfo) { $("infoBtn").style.top = Math.round(stackY) + "px"; stackY += $("infoBtn").offsetHeight + stackGap; }
+    if (!showTimes) $("timeBtn").style.top = Math.round(stackY) + "px";
+  }
+  function boxFrame(r, col, edge, fs) {   // 四角の枠：ふち（黒など）の上に文字と同じ色の線
+    var rad = fs * 0.2;
+    function path() {
+      c2.beginPath();
+      if (c2.roundRect) c2.roundRect(r.l, r.t, r.r - r.l, r.b - r.t, rad); else c2.rect(r.l, r.t, r.r - r.l, r.b - r.t);
+    }
+    path(); c2.lineWidth = fs * 0.2; c2.strokeStyle = edge; c2.stroke();
+    path(); c2.lineWidth = fs * 0.09; c2.strokeStyle = col; c2.stroke();
+  }
+  var ICON_GEAR = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="currentColor" fill-rule="evenodd" d="M19.64,9.64 L22.41,10.00 L22.41,14.00 L19.64,14.36 L19.08,15.73 L20.78,17.94 L17.94,20.78 L15.73,19.08 L14.36,19.64 L14.00,22.41 L10.00,22.41 L9.64,19.64 L8.27,19.08 L6.06,20.78 L3.22,17.94 L4.92,15.73 L4.36,14.36 L1.59,14.00 L1.59,10.00 L4.36,9.64 L4.92,8.27 L3.22,6.06 L6.06,3.22 L8.27,4.92 L9.64,4.36 L10.00,1.59 L14.00,1.59 L14.36,4.36 L15.73,4.92 L17.94,3.22 L20.78,6.06 L19.08,8.27 Z M12,8.4 A3.6,3.6 0 1,0 12,15.6 A3.6,3.6 0 1,0 12,8.4 Z"/></svg>';
+  var ICON_CLOCK = '<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 6.5 V12 L15.8 14.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var runIsMy = false;                   // マイタイマー使用中なら、歯車の代わりにピンクの時計
+  function idleIcon() { return runIsMy ? ICON_CLOCK : ICON_GEAR; }
+  function paintInfoBtn() {
+    $("infoBtn").innerHTML = idleIcon();
+    $("infoBtn").style.visibility = showInfo ? "hidden" : "";   // 文字を表示しているときは、ボタンは出さない（四角をタッチで隠す）
+    $("infoBtn").className = (showInfo ? "on" : "") + (runIsMy ? " my" : "");
+  }
+  $("infoBtn").innerHTML = ICON_GEAR;
+  // 右上の音量ボタン
+  $("runVolBtn").innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="currentColor" d="M3 9.5 H7 L12.5 5 V19 L7 14.5 H3 Z"/><path d="M15.5 8.8 Q18 12 15.5 15.2 M18 6.3 Q22.5 12 18 17.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>';
+  var rvHide = null;
+  function rvRender() { $("rvSlider").value = cfg.vol; $("rvVal").textContent = cfg.vol + "%"; }
+  function rvSet(v) {
+    cfg.vol = Math.max(0, Math.min(100, v));
+    applyVolume(); saveCfg(); rvRender();
+    try { renderSound(); } catch (e) {}
+    rvAutoHide();
+  }
+  function rvAutoHide() {                  // 触らずに5秒たったら閉じる
+    clearTimeout(rvHide);
+    rvHide = setTimeout(rvClose, 5000);
+  }
+  function rvClose() { clearTimeout(rvHide); $("runVolPanel").className = ""; $("runVolBtn").className = ""; }
+  $("runVolBtn").addEventListener("click", function (e) {
+    e.stopPropagation();
+    if ($("runVolPanel").className === "on") { rvClose(); return; }
+    rvRender(); $("runVolPanel").className = "on"; this.className = "on"; rvAutoHide();
+  });
+  $("runVolPanel").addEventListener("click", function (e) { e.stopPropagation(); });   // パネルを触っても操作バーを出さない
+  $("rvSlider").addEventListener("input", function () { rvSet(parseInt(this.value, 10) || 0); });
+  $("rvSlider").addEventListener("change", function () { rvSet(parseInt(this.value, 10) || 0); });
+  setTimeout(function () {                 // ＋－：タップで1％、長押しで5％ずつ
+    holdBtn($("rvDown"), function (k) { rvSet(cfg.vol - k); });
+    holdBtn($("rvUp"), function (k) { rvSet(cfg.vol + k); });
+  }, 0);
+  var showTimes = true, timesRect = null;   // 歯車の下の「経過・残り・合計」：原則として表示
+  function hms(t) {                        // 秒 → 12:30（1時間以上は 1:02:30）
+    t = Math.max(0, Math.round(t));
+    var hh = Math.floor(t / 3600), mm = Math.floor(t % 3600 / 60), ss = t % 60;
+    return hh ? hh + ":" + pad(mm) + ":" + pad(ss) : mm + ":" + pad(ss);
+  }
+  function timesLines() {
+    var d = new Date(), sumAll = 0, rest = 0, k;
+    for (k = 0; k < plan.length; k++) sumAll += plan[k];
+    var mt = /^(\d\d):(\d\d)$/.exec(curText || "");
+    rest = mt ? parseInt(mt[1], 10) * 60 + parseInt(mt[2], 10) : 0;
+    if (running) for (k = round; k < plan.length; k++) rest += plan[k];
+    return [zen("経過 " + hms(sumAll - rest)), zen("残り " + hms(rest)), zen("合計 " + hms(sumAll))];
+  }
+  var ICON_TIMES = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M7 2.5 H17 M7 21.5 H17 M8 2.5 V6.5 Q8 9.5 12 12 Q16 9.5 16 6.5 V2.5 M8 21.5 V17.5 Q8 14.5 12 12 Q16 14.5 16 17.5 V21.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 19.5 Q12 16.5 14.5 19.5 Z" fill="currentColor"/></svg>';
+  function paintTimeBtn() {
+    $("timeBtn").innerHTML = ICON_TIMES;
+    $("timeBtn").style.visibility = showTimes ? "hidden" : "";
+    $("timeBtn").className = showTimes ? "on" : "";
+  }
+  $("timeBtn").addEventListener("click", function (e) { e.stopPropagation(); showTimes = !showTimes; paintTimeBtn(); draw(); });
+  var showInfo = true;                  // 左上の設定表示：原則として表示（×か文字をタッチで隠す）
+  var infoRect = null;                  // 左上の文字の範囲（タッチで隠す用）
+  $("infoBtn").addEventListener("click", function (e) {
+    e.stopPropagation();
+    showInfo = !showInfo;
+    paintInfoBtn();
+    draw();
+  });
+  function setBig(text, color, bg) {
+    curText = text; curColor = color || COLOR.normal; curBg = bg || null; draw();
+    var bw = $("bigWord"); if (bw.className && bw.lastChild) bw.lastChild.textContent = text;   // 「試合」「移動」の下のカウントも進める
+  }
+  window.addEventListener("resize", draw);
+  window.addEventListener("orientationchange", function () { setTimeout(draw, 300); });
+
+  // ---------- 操作バー（画面タップで表示） ----------
+  var ctrlTimer = null;
+  var CTRL_MS = 5000;
+  function showCtrl(autoHide) {
+    $("ctrl").className = "on";
+    if (cfg.kbd) setTimeout(function () { if ($("ctrl").className === "on" && vis($("pauseBtn"))) $("pauseBtn").focus(); }, 0);   // キーボードON：一時停止（一時停止を解除）を選んでおく
+    clearTimeout(ctrlTimer);
+    if (autoHide) ctrlTimer = setTimeout(function () {   // 何も選ばなくても、数秒でカウントに戻る
+      if (running && !paused) $("ctrl").className = "";
+    }, CTRL_MS);
+  }
+  $("run").addEventListener("click", function (e) {
+    // 左上の文字をタッチしたら隠す
+    if (showInfo && infoRect && e.target.id === "cv" && e.clientX >= infoRect.l && e.clientX <= infoRect.r && e.clientY >= infoRect.t && e.clientY <= infoRect.b) {   // 四角をタッチで隠す
+      showInfo = false; infoRect = null; paintInfoBtn(); draw(); return;
+    }
+    if (showTimes && timesRect && e.target.id === "cv" && e.clientX >= timesRect.l && e.clientX <= timesRect.r && e.clientY >= timesRect.t && e.clientY <= timesRect.b) {   // 歯車の下の時間をタッチしたら隠す
+      showTimes = false; timesRect = null; paintTimeBtn(); draw(); return;
+    }
+    if (!running) return;
+    for (var t = e.target; t && t !== this; t = t.parentNode) {   // ボタン（中の図形も含む）を押したときは何もしない
+      if (t.tagName === "BUTTON" || t.id === "runVolPanel") return;
+    }
+    if ($("ctrl").className === "on" && running && !paused) $("ctrl").className = "";
+    else showCtrl(running && !paused);
+  });
+
+  // ---------- タイマー本体 ----------
+  var total = 0, round = 1, endAt = 0, remainMs = 0, running = false, paused = false, ticker = null, lastShown = -1;
+
+  function show(s) {
+    var text = pad(Math.floor(s / 60)) + ":" + pad(s % 60);   // 常に 00:00 の4桁
+    var color = planC[round - 1] || COLOR.normal;   // 選んだ数字の色のまま（最後の10秒も変えない）
+    setBig(text, color, planB[round - 1]);
+  }
+
+  function startRound(chain) {
+    // 次の時間は「前の時間が終わる予定だった時刻」から数える（遅れがたまらない）
+    endAt = chain ? endAt + total * 1000 : Date.now() + total * 1000;
+    spoken = {}; played = {};
+    lastShown = -1;
+    tick();
+  }
+
+  function tick() {
+    if (!running || paused) return;
+    var ms = endAt - Date.now();
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    if (s !== lastShown) {
+      lastShown = s;
+      show(s);
+      if (ms > -1500) soundFor(s, ms);           // 画面が消えていて大きく遅れたときは、過ぎた時間の音は鳴らさない
+    }
+    if (ms <= 0) {
+      stopLong();
+      if (round < plan.length) { round++; total = plan[round - 1]; startRound(true); }
+      else finish();
+    }
+  }
+
+  function finish() {
+    running = false;
+    clearInterval(ticker);
+    stopLong();
+    setBig("00:00", COLOR.normal);           // 終わったら 00:00 のまま表示
+    clearTimeout(resumeMsgTimer);
+    $("state").textContent = "終了しました";  // 真ん中に表示（一時停止中と同じ見た目）
+    clearTimeout(ctrlTimer);
+    $("ctrl").className = "";                // 下の操作バーは出さない（数字を隠さない）
+    $("backBtn").style.display = "block";    // 右上に「もどる」
+    rvClose(); $("runVolBtn").style.display = "none";
+    releaseAwake();
+  }
+
+  $("startBtn").addEventListener("click", function () {
+    if (viewing) { backToTimer(); return; }   // 一時停止中に設定を見ているときは「タイマーにもどる」
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    buildSeq();
+    if (!seq.length || !plan.length) return;  // 時間がぜんぶ0、または回数が0のときはスタートしない
+    total = plan[0];
+    runIsMy = !!activePreset();             // マイタイマー使用中か
+    showInfo = true; paintInfoBtn();          // 左上の情報は、原則として表示
+    showTimes = true; paintTimeBtn(); $("timeBtn").style.display = "";   // 右上の時間も、原則として表示
+    saveCfg();
+    stopTest();
+    goFullLandscape();
+    initAudio();
+    unlockSpeech();
+    if (BASE_SOUND) startSound();
+    keepAwake();
+    $("setup").className = "screen";
+    $("run").className = "screen on";
+    $("backBtn").style.display = "none";
+    $("pauseBtn").textContent = "一時停止";
+    $("stopBtn").textContent = "カウントをやめる";
+    $("retBtn").style.display = "";
+    $("state").textContent = "";
+    round = 1; running = true; paused = false;
+    clearInterval(ticker);
+    ticker = setInterval(tick, 40);
+    startRound();
+    $("ctrl").className = "";                // スタート直後は下のボタンを出さない
+    $("runVolBtn").style.display = ""; rvClose();
+    $("state").textContent = "スタート";      // 真ん中に1秒だけ表示（一時停止を解除と同じ）
+    clearTimeout(resumeMsgTimer);
+    resumeMsgTimer = setTimeout(function () { if (!paused) $("state").textContent = ""; }, 1000);
+  });
+
+  var resumeMsgTimer = null;
+  $("pauseBtn").addEventListener("click", function () {
+    if (!running) return;
+    if (!paused) {
+      paused = true;
+      remainMs = endAt - Date.now();
+      stopLong();
+      stopSpeech();
+      this.textContent = "一時停止を解除";
+      clearTimeout(resumeMsgTimer);
+      pauseAudio();                          // 鳴っている途中・これから鳴る合図音も一時停止
+      $("state").textContent = "一時停止中";
+      $("viewBtn").style.display = "inline-block";
+      $("retBtn").style.display = "none"; $("stopBtn").textContent = "カウントをやめる";   // 一時停止中：一時停止を解除・カウントをやめる・設定を見る
+      showCtrl(false);
+    } else {
+      paused = false;
+      initAudio();
+      endAt = Date.now() + remainMs;
+      lastShown = -1;
+      this.textContent = "一時停止";
+      $("viewBtn").style.display = "none";
+      $("retBtn").style.display = ""; $("stopBtn").textContent = "カウントをやめる";
+      clearTimeout(ctrlTimer);
+      $("ctrl").className = "";              // 再開したら下のボタンは出さない
+      $("state").textContent = "一時停止を解除";  // 真ん中に1秒だけ表示
+      clearTimeout(resumeMsgTimer);
+      resumeMsgTimer = setTimeout(function () { if (!paused) $("state").textContent = ""; }, 1000);
+      tick();
+    }
+  });
+
+  // 一時停止中に設定画面を見る
+  var viewing = false;
+  $("viewBtn").addEventListener("click", function () {
+    if (!running || !paused) return;
+    viewing = true;
+    $("run").className = "screen";
+    $("setup").className = "screen on";
+    $("pauseBanner").textContent = "一時停止中";
+    $("setup").className = "screen on viewLock";
+    placeBanner();
+    lockList(true);
+    updateTotals();
+    $("startBtn").style.display = "none";
+    $("viewCtrl").style.display = "-webkit-flex"; $("viewCtrl").style.display = "flex";
+  });
+  // 「一時停止中 残り」の表示は、選んでいないほうのボタン（リピート／ランダム）の上に重ねる
+  function placeBanner() {
+    var other = $("modeBar").querySelector('button[data-m="' + (runMode === "list" ? "same" : "list") + '"]');
+    var r = other.getBoundingClientRect(), b = $("pauseBanner").style;
+    b.left = r.left + "px"; b.top = r.top + "px"; b.width = r.width + "px"; b.height = r.height + "px";
+    b.padding = "0"; b.display = "";
+    b.lineHeight = Math.max(0, r.height - 1.6 * 0.01 * window.innerHeight) + "px";
+  }
+  window.addEventListener("resize", function () { if (viewing) placeBanner(); });
+  // 一時停止中：もとの時間の設定を見せる（押せない・選べない）。いまの時間に枠
+  function lockList(on) {
+    var fl = $("fList");
+    if (on) { fl.setAttribute("inert", ""); fl.setAttribute("aria-disabled", "true"); }
+    else { fl.removeAttribute("inert"); fl.removeAttribute("aria-disabled"); }
+    var rows = fl.querySelectorAll(".tScroll .tRow:not(.addOnly)"), len = seq.length || 1, st = (round - 1) % len;
+    for (var i = 0; i < rows.length; i++) rows[i].className = rows[i].className.replace(/\s*vCur/g, "") + (on && i === st ? " vCur" : "");
+    if (on) setTimeout(function () { fitRows(); alignAdd(); }, 0);
+  }
+  function backToTimer() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    viewing = false;
+    $("sndPanel").className = ""; $("annPanel").className = "";
+    $("startBtn").style.display = "";
+    $("viewCtrl").style.display = "none";
+    lockList(false);
+    $("setup").className = "screen";
+    $("run").className = "screen on";
+    draw();
+    showCtrl(false);
+  }
+
+  $("vBack").addEventListener("click", backToTimer);
+  $("vResume").addEventListener("click", function () { backToTimer(); $("pauseBtn").click(); });
+  $("vStop").addEventListener("click", function () { goBack(); });
+
+  function goBack() {
+    viewing = false;
+    hideBigWord();
+    lockList(false);
+    setTimeout(updateTotals, 0);
+    cancelAudio();                           // やめたら、残っている合図音は鳴らさない
+    $("startBtn").style.display = "";
+    $("viewCtrl").style.display = "none";
+    $("viewBtn").style.display = "none";
+    stopSpeech();
+    running = false; paused = false;
+    clearInterval(ticker);
+    stopLong();
+    releaseAwake();
+    $("ctrl").className = "";
+    $("run").className = "screen";
+    $("setup").className = "screen on";
+    $("backBtn").style.display = "none";
+  }
+  $("stopBtn").addEventListener("click", goBack);
+  $("retBtn").addEventListener("click", function () { clearTimeout(ctrlTimer); $("ctrl").className = ""; });   // カウントに戻る：ボタンを消すだけ
+  $("backBtn").addEventListener("click", goBack);
+
+  // ---------- キーボード操作（設定画面の⌨ボタンでオン・オフ。最初はオフ） ----------
+  function paintKbd() {
+    $("kbdBtn").className = cfg.kbd ? "on" : "";
+    $("kbdBtn").querySelector(".sw").textContent = cfg.kbd ? "ON" : "OFF";
+    document.body.className = cfg.kbd ? "kbd" : "";
+  }
+  $("kbdBtn").addEventListener("click", function () { cfg.kbd = !cfg.kbd; saveCfg(); paintKbd(); if (!cfg.kbd) $("keyHelp").className = ""; });
+  paintKbd();
+  function vis(el) { return el && el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden"; }
+  // いちばん上に開いている画面（矢印・Enter・Escの対象）
+  function topLayer() {
+    if ($("keyHelp").className === "on") return { root: $("keyHelp"), close: function () { $("keyHelp").className = ""; } };
+    if ($("dupMsg").style.display === "block") return { root: $("dupMsg"), close: function () { $("dupMsg").style.display = "none"; } };
+    var L = [["warnDlg", "warnOk"], ["colorDlg", "cdX"], ["saveDlg", "sdCancel"], ["apSaveDlg", "apSaveX"], ["apPanel", "apClose"], ["presetPanel", "presetClose"],
+             ["annPanel", "annClose"], ["sndPanel", "sndClose"]];
+    for (var i = 0; i < L.length; i++) if ($(L[i][0]).className.indexOf("on") >= 0) {
+      var cb = $(L[i][1]);
+      return { root: $(L[i][0]), close: function () { cb.click(); } };
+    }
+    if ($("setup").className.indexOf("on") >= 0) return { root: $("setup"), close: null };
+    return { root: null, close: null, run: true };
+  }
+  function focusables(root) {
+    var all = root.querySelectorAll("button, input, select"), out = [];
+    for (var i = 0; i < all.length; i++) if (!all[i].disabled && vis(all[i])) out.push(all[i]);
+    return out;
+  }
+  var lastEl = null, lastRect = null;
+  document.addEventListener("focusin", function (e) { if (cfg.kbd) { lastEl = e.target; lastRect = e.target.getBoundingClientRect(); } });
+  function center(r) { return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 }; }
+  function pickNear(list, r) {                 // 前に選んでいた場所にいちばん近い項目
+    var c = center(r), best = null, bd = 1e9;
+    for (var i = 0; i < list.length; i++) { var d = center(list[i].getBoundingClientRect()); var dd = Math.abs(d.x - c.x) + Math.abs(d.y - c.y); if (dd < bd) { bd = dd; best = list[i]; } }
+    return best;
+  }
+  function moveFocus(dir, fromRect) {
+    var layer = topLayer(); if (!layer.root) return;
+    var list = focusables(layer.root); if (!list.length) return;
+    var cur = document.activeElement;
+    if (fromRect) {                              // 入力欄から出たとき：その欄があった場所から探す
+      cur = null; var r = fromRect, c = center(r), best = null, bs = 1e9;
+      list = list.filter(function (el) { var q = el.getBoundingClientRect(); return !(Math.abs(q.left - r.left) < 2 && Math.abs(q.top - r.top) < 2); });
+    } else if (!cur || list.indexOf(cur) < 0) {
+      if (lastEl && list.indexOf(lastEl) >= 0) cur = lastEl;
+      else if (lastRect) { var n = pickNear(list, lastRect); if (n) { n.focus(); return; } }
+      if (!cur || list.indexOf(cur) < 0) { list[0].focus(); return; }
+    }
+    if (!fromRect) { var r = cur.getBoundingClientRect(), c = center(r), best = null, bs = 1e9; }
+    var horiz = dir === "left" || dir === "right";
+    var grp = cur && cur.closest ? cur.closest(".addGrp") : null;
+    var grpEnd = false;
+    if (grp && dir === "right") { grpEnd = true; var gb = focusables(grp); for (var g2 = 0; g2 < gb.length; g2++) if (gb[g2] !== cur && gb[g2].getBoundingClientRect().left >= r.right - 2) grpEnd = false; }
+    var sameRow = false;
+    if (horiz) for (var j = 0; j < list.length; j++) {
+      if (list[j] === cur) continue;
+      var qq = list[j].getBoundingClientRect(), dd = center(qq);
+      if (qq.top < r.bottom && qq.bottom > r.top && (dir === "left" ? dd.x < c.x - 1 && qq.right <= r.left + 2 : dd.x > c.x + 1 && qq.left >= r.right - 2)) { sameRow = true; break; }
+    }
+    var strictV = false;                         // ↑↓：完全に上（下）にある項目があれば、そちらだけ
+    if (!horiz) for (var j2 = 0; j2 < list.length; j2++) {
+      if (list[j2] === cur) continue;
+      var q2 = list[j2].getBoundingClientRect();
+      if (dir === "up" ? q2.bottom <= r.top + 2 : q2.top >= r.bottom - 2) { strictV = true; break; }
+    }
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]; if (el === cur) continue;
+      var q = el.getBoundingClientRect(), d = center(q), main, side;
+      if (strictV && (dir === "up" ? q.bottom > r.top + 2 : q.top < r.bottom - 2)) continue;
+      if (dir === "left") { if (q.right > r.left + 2 && d.x >= c.x - 1) continue; main = c.x - d.x; side = Math.max(0, Math.max(q.top - r.bottom, r.top - q.bottom)); }
+      else if (dir === "right") { if (q.left < r.right - 2 && d.x <= c.x + 1) continue; main = d.x - c.x; side = Math.max(0, Math.max(q.top - r.bottom, r.top - q.bottom)); }
+      else if (dir === "up") { if (q.bottom > r.top + 2 && d.y > r.top) continue; main = Math.max(1, r.top - q.bottom); side = Math.max(0, Math.max(q.left - r.right, r.left - q.right)) + Math.abs(d.x - c.x) * 0.05; }
+      else { if (q.top < r.bottom - 2 && d.y < r.bottom) continue; main = Math.max(1, q.top - r.bottom); side = Math.max(0, Math.max(q.left - r.right, r.left - q.right)) + Math.abs(d.x - c.x) * 0.05; }
+      if (main <= 0) continue;
+      if (horiz && grp && !grp.contains(el) && !(dir === "right" && grpEnd)) continue;   // 時間を増やす・減らす・全部消す：←→はこの中だけ（右端の「全部消す」から→は右の列へ）
+      if (horiz && sameRow && side > 0) continue;           // ←→：同じ段に項目があれば、その段だけ
+      var score = main + side * (horiz ? 4 : 1.2) + (horiz ? Math.abs(d.y - c.y) * 0.1 : 0);
+      if (score < bs) { bs = score; best = el; }
+    }
+    if (best) best.focus();
+  }
+  // ---- 画面ごとのカーソルの最初の置き場所 ----
+  //   開いた画面：決めたボタン／閉じたとき：その画面を開いたボタンにもどる
+  function firstFor(R) {
+    if (!R) return null;
+    var id = R.id, q;
+    if (id === "sndPanel") return $("sndOnOff").querySelector("[data-kfirst]");     // 合図音：「あり」
+    if (id === "annPanel") return $("annOnOff").querySelector("[data-kfirst]");     // アナウンス：「あり」
+    if (id === "colorDlg") return R.querySelector(".opt.sel") || R.querySelector(".opt");   // 数字の色：今の色
+    if (id === "saveDlg") return $("sdOk");                                         // この設定を保存：「保存」
+    if (id === "apSaveDlg") return $("apSaveOk");                                   // アナウンスの設定を保存：「保存」
+    if (id === "presetPanel") return R.querySelector(".pLoad") || $("presetClose"); // 保存した設定：いちばん上の「呼び出す」
+    if (id === "apPanel") return R.querySelector(".pLoad") || $("apClose");         // 保存したアナウンスの設定：いちばん上の「呼び出す」
+    if (id === "setup") return viewing ? $("vResume") : $("kbdBtn");               // 設定画面：キーボードボタン（一時停止中に見ているときは「一時停止を解除」）
+    if (id === "run") return (!running && vis($("backBtn"))) ? $("backBtn") : null; // 終わった画面：「もどる」
+    return null;
+  }
+  var openers = [], lastRoot = null, lastFocus = null;
+  document.addEventListener("focusin", function (e) { lastFocus = e.target; });
+  function curRoot() { var L = topLayer(); return L.root || (L.run ? $("run") : null); }
+  function layerWatch() {
+    var R = curRoot();
+    if (R === lastRoot) return false;
+    var prev = lastRoot; lastRoot = R;
+    if (!cfg.kbd) { openers = []; return false; }
+    var i, o = null;
+    for (i = openers.length - 1; i >= 0; i--) if (openers[i].root === prev && openers[i].under === R) { o = openers.splice(i, 1)[0]; break; }
+    if (o && R) {               // 閉じた：開いたボタン（作り直されていたら同じ場所のボタン）
+      var list = focusables(R);
+      if (list.indexOf(o.el) >= 0) o.el.focus(); else { var n = pickNear(list, o.rect); if (n) n.focus(); else { var f0 = firstFor(R); if (f0 && vis(f0)) f0.focus(); } }
+      return true;
+    }
+    var isDlg = R && R !== $("setup") && R !== $("run");
+    if (isDlg && prev && lastFocus && prev.contains(lastFocus)) openers.push({ root: R, under: prev, el: lastFocus, rect: lastFocus.getBoundingClientRect() });
+    var f = firstFor(R);
+    if (f && vis(f)) { f.focus(); return true; }
+    return false;
+  }
+  setInterval(layerWatch, 80);
+  setTimeout(function () { lastRoot = curRoot(); }, 0);
+  function pressEl(el) {                       // Enter：ボタンを押す（長押し対応のボタンも1回押したことにする）
+    var r = el.getBoundingClientRect(), L0 = topLayer().root;
+    function ev(t) { try { el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })); } catch (e) {} }
+    ev("mousedown"); ev("mouseup"); el.click();
+    setTimeout(function () {                   // 押したあとも、同じ場所の項目を選んだままにする
+      if (layerWatch()) return;
+      if (topLayer().root !== L0) return;      // 画面が変わったときは、その画面の置き場所にまかせる
+      if (document.body.contains(el) && vis(el)) { if (document.activeElement !== el) el.focus(); return; }
+      var layer = topLayer(); if (!layer.root) return;
+      var n = pickNear(focusables(layer.root), r); if (n) n.focus();
+    }, 30);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!cfg.kbd) return;
+    var t = e.target, tag = (t && t.tagName) || "", isText = tag === "INPUT" && t.type !== "range", isRange = tag === "INPUT" && t.type === "range";
+    var k = e.key;
+    // ？：キーの割り当て一覧（文字の入力中は、ふつうに「？」を入力）
+    if ((k === "?" || k === "？" || k === "/" || k === "／" || k === "・" || e.code === "Slash" || e.code === "NumpadDivide") && !isText) { e.preventDefault(); $("keyHelp").className = $("keyHelp").className === "on" ? "" : "on"; return; }
+    if (k === "Escape" || k === "Esc") {
+      var lay = topLayer(); if (lay.close) { e.preventDefault(); lay.close(); setTimeout(layerWatch, 30); }
+      return;
+    }
+    if (tag === "SELECT" && (k === "Enter" || k === " " || k === "Spacebar")) {   // プルダウン：Enter・スペースで一覧を開く
+      e.preventDefault(); try { if (t.showPicker) t.showPicker(); } catch (er5) {} return;
+    }
+    if (k === " " || k === "Spacebar") {
+      if (isText) return;                      // 文字の入力中はふつうに空白
+      e.preventDefault();
+      if (running) { if ($("run").className.indexOf("on") >= 0) $("pauseBtn").click(); else if (viewing) $("vResume").click(); }
+      else if ($("setup").className.indexOf("on") >= 0 && topLayer().root === $("setup")) $("startBtn").click();
+      return;
+    }
+    var layer = topLayer();
+    var isArrow = /^(Arrow)?(Up|Down|Left|Right)$/.test(k);
+    if (layer.run) {                           // カウント画面：一時停止中の「一時停止を解除・カウントをやめる・設定を見る」だけ
+      if (!running) {                         // 終わった画面：Enterで「もどる」
+        if (k === "Enter" && vis($("backBtn"))) { e.preventDefault(); $("backBtn").click(); }
+        return;
+      }
+      if ($("ctrl").className !== "on") {     // ボタンが出ていないとき：Enterで出す（画面をタップしたのと同じ）
+        if (k === "Enter") { e.preventDefault(); showCtrl(!paused); }
+        return;
+      }
+      var cb = [$("pauseBtn"), $("stopBtn"), $("retBtn"), $("viewBtn")].filter(vis);
+      if (isArrow) {
+        e.preventDefault();
+        var ci = cb.indexOf(document.activeElement);
+        if (ci < 0) ci = 0;
+        else ci = (ci + (/Left|Up/.test(k) ? -1 : 1) + cb.length) % cb.length;
+        cb[ci].focus();
+        if (!paused) {                         // 動かしている間はボタンを消さない（3秒たったら消える）
+          clearTimeout(ctrlTimer);
+          ctrlTimer = setTimeout(function () { if (running && !paused) $("ctrl").className = ""; }, CTRL_MS);
+        }
+        return;
+      }
+      if (k === "Enter") { e.preventDefault(); if (cb.indexOf(document.activeElement) >= 0) document.activeElement.click(); else $("pauseBtn").click(); }
+      return;
+    }
+    // 数字の入力欄：＋－キーで数字を増やす・減らす（日本語入力ONでもキーの場所で判定）
+    if (isText && t.type === "number") {
+      var pm0 = pmKey(e);
+      if (pm0) { e.preventDefault(); stepNum(t, pm0 > 0); return; }
+    }
+    // 音量のスライダー：＋－キーで音量を増減（←→は項目の移動だけ）
+    if (isRange && t.id === "vol") {
+      var pm2 = pmKey(e);
+      if (pm2) {
+        e.preventDefault();
+        var vb = $(pm2 > 0 ? "volUp" : "volDown");
+        try { vb.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window })); vb.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window })); } catch (er3) {}
+        vb.click();
+        setTimeout(function () { if (document.activeElement !== t && vis(t)) t.focus(); }, 30);
+        return;
+      }
+    }
+    // ＋－ボタンを選んでいるとき：＋－キーで増減（Shiftあり・なしどちらでも）
+    if (tag === "BUTTON" && /^[＋+－-]$/.test((t.textContent || "").replace(/\s/g, ""))) {
+      var pm1 = pmKey(e);
+      if (pm1) {
+        e.preventDefault();
+        var isPlus = /[＋+]/.test(t.textContent), target = t;
+        if ((pm1 > 0) !== isPlus) {            // 反対の向き：同じ数字の、もう片方のボタン
+          if (t.id === "volUp") target = $("volDown");
+          else if (t.id === "volDown") target = $("volUp");
+          else {
+            var inp = isPlus ? t.previousElementSibling : t.nextElementSibling;
+            target = inp && inp.tagName === "INPUT" ? (isPlus ? inp.previousElementSibling : inp.nextElementSibling) : null;
+          }
+        }
+        if (target && target.tagName === "BUTTON" && !target.disabled) {
+          try { target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window })); target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window })); } catch (er) {}
+          target.click();
+          var tr = t.getBoundingClientRect();
+          setTimeout(function () {             // 選んでいるボタンはそのまま
+            if (document.body.contains(t) && vis(t)) { if (document.activeElement !== t) t.focus(); return; }
+            var l4 = topLayer(); if (l4.root) { var n4 = pickNear(focusables(l4.root), tr); if (n4) n4.focus(); }
+          }, 30);
+        }
+        return;
+      }
+    }
+    if (isArrow) {
+      var dir = /Up/.test(k) ? "up" : /Down/.test(k) ? "down" : /Left/.test(k) ? "left" : "right";
+      e.preventDefault();
+      if (isText) { var rr = t.getBoundingClientRect(); t.blur(); moveFocus(dir, rr); return; }   // 入力欄からは、どの矢印でも次の項目へ
+      moveFocus(dir); return;
+    }
+    if (k === "Enter") {
+      if (t === $("dupMsg") || layer.root === $("dupMsg")) { e.preventDefault(); $("dupMsg").style.display = "none"; return; }
+      if (isText) {                            // 入力を決定して、その欄を選んだままにする
+        var el0 = t, r0 = t.getBoundingClientRect();
+        setTimeout(function () {
+          if (document.activeElement === el0) return;
+          if (document.body.contains(el0) && vis(el0)) { el0.focus(); return; }
+          var lay2 = topLayer(); if (lay2.root) { var n2 = pickNear(focusables(lay2.root), r0); if (n2) n2.focus(); }
+        }, 30);
+        return;
+      }
+      if (tag === "BUTTON") { e.preventDefault(); pressEl(t); }
+    }
+  });
+  // ＋－キーかどうか（キーの場所で判定するので、Shiftあり・なし、日本語入力ON・OFFどれでも）：＋なら1、－なら-1
+  function pmKey(e) {
+    var k = e.key, c0 = e.code || "", kc = e.keyCode || e.which || 0;
+    if (c0 === "Minus" || c0 === "NumpadSubtract") return -1;
+    if (c0 === "Semicolon" || c0 === "Equal" || c0 === "NumpadAdd") return 1;
+    if (k === "-" || k === "－" || k === "_" || k === "Subtract" || kc === 109 || kc === 189 || kc === 173) return -1;
+    if (k === "+" || k === "＋" || k === ";" || k === "；" || k === "Add" || kc === 107 || kc === 187 || kc === 59 || kc === 186 || kc === 61) return 1;
+    return 0;
+  }
+  var lastStep = 0;
+  function stepNum(t, up) {
+    var now = Date.now(); if (now - lastStep < 40) return; lastStep = now;   // 1回のキーで2回動かない
+    var btn = null;
+    if (t.id === "volVal") btn = $(up ? "volUp" : "volDown");
+    else {
+      var sb = up ? t.nextElementSibling : t.previousElementSibling;
+      if (sb && sb.tagName === "BUTTON" && /[＋+－-]/.test(sb.textContent)) btn = sb;
+    }
+    var el1 = t, r1 = t.getBoundingClientRect();
+    t.blur();                                  // 打った数字を先に決定
+    if (btn && document.body.contains(btn) && !btn.disabled) {
+      try { btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window })); btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window })); } catch (er) {}
+      btn.click();
+    } else if (document.body.contains(el1)) {
+      var v = (parseInt(el1.value, 10) || 0) + (up ? 1 : -1);
+      if (el1.max !== "") v = Math.min(v, +el1.max); if (el1.min !== "") v = Math.max(v, +el1.min);
+      el1.value = v;
+      try { el1.dispatchEvent(new Event("input", { bubbles: true })); el1.dispatchEvent(new Event("change", { bubbles: true })); } catch (er2) {}
+    }
+    setTimeout(function () {                   // その欄を選んだままにする
+      if (document.body.contains(el1) && vis(el1)) { el1.focus(); return; }
+      var lay3 = topLayer(); if (lay3.root) { var n3 = pickNear(focusables(lay3.root), r1); if (n3) n3.focus(); }
+    }, 30);
+  }
+  // 念のため：キーで止められずに「＋」「－」が入力されそうになったときも、増減に変える
+  document.addEventListener("beforeinput", function (e) {
+    var t = e.target;
+    if (!cfg.kbd || !t || t.tagName !== "INPUT" || t.type !== "number" || !e.data) return;
+    var up = /[+＋;；=＝]/.test(e.data), dn = /[-－ー−]/.test(e.data);
+    if (up || dn) { e.preventDefault(); stepNum(t, up); }
+  }, true);
+  // キーボードONの設定画面で、どこも選ばれていないときは、いつもキーボードボタンを選んでおく
+  function keepFocus() {
+    if (!cfg.kbd) return;
+    var a = document.activeElement;
+    if (a && a !== document.body && a !== document.documentElement && vis(a)) return;
+    var R = curRoot(); if (R !== $("setup") && R !== $("run")) return;
+    var f = firstFor(R); if (f && vis(f)) f.focus();
+  }
+  document.addEventListener("focusout", function () { setTimeout(keepFocus, 60); });
+  setInterval(keepFocus, 400);
+  document.addEventListener("keyup", function (e) { if (cfg.kbd && (e.key === " " || e.key === "Spacebar") && e.target.tagName === "BUTTON") e.preventDefault(); });
+  $("keyHelp").addEventListener("click", function () { $("keyHelp").className = ""; });
+
+
+  // ---- ホーム画面に置くアプリ（PWA）：電波がなくても開けるように保存しておく ----
+  (function () {
+    if (!("serviceWorker" in navigator)) return;
+    if (location.protocol !== "https:" && location.hostname !== "localhost") return;   // ファイルで開いたときは使わない
+    if (window.claude) return;                                                          // claude.ai のアーティファクトでは使わない
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").then(function (reg) {
+        reg.addEventListener("updatefound", function () {
+          var w = reg.installing; if (!w) return;
+          w.addEventListener("statechange", function () {
+            if (w.state === "installed" && navigator.serviceWorker.controller) {
+              try { toast("新しい版を受け取りました。次に開いたときから切り替わります"); } catch (e) {}
+            }
+          });
+        });
+      }, function () {});
+    });
+  })();
+
+  // 設定画面で最初にタップしたら全画面・横向き固定を試す
+  document.addEventListener("touchend", function once() {
+    goFullLandscape();
+    document.removeEventListener("touchend", once);
+  });
+})();
+
+</script>
+</body>
+</html>
